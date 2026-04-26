@@ -1,0 +1,752 @@
+-- ============================================================
+--  GIAI ĐOẠN 3: ĐỐI TƯỢNG CƠ SỞ DỮ LIỆU NÂNG CAO
+--  Event Management System — NEU DATCOM Lab | Project 14
+--  Chạy sau phase1_schema.sql
+-- ============================================================
+
+USE event_management;
+
+
+-- ============================================================
+-- PHẦN 1: INDEXES — Tối ưu tốc độ truy vấn
+-- Giảm thời gian tìm kiếm từ O(n) xuống O(log n)
+-- ============================================================
+
+-- Xóa index cũ nếu tồn tại (tránh lỗi khi chạy lại)
+DROP INDEX IF EXISTS idx_events_start_time          ON Events;
+DROP INDEX IF EXISTS idx_events_status              ON Events;
+DROP INDEX IF EXISTS idx_events_organizer           ON Events;
+DROP INDEX IF EXISTS idx_guests_email               ON Guests;
+DROP INDEX IF EXISTS idx_guests_name                ON Guests;
+DROP INDEX IF EXISTS idx_registrations_event_guest  ON Registrations;
+DROP INDEX IF EXISTS idx_registrations_attendance   ON Registrations;
+DROP INDEX IF EXISTS idx_finances_event_type        ON Finances;
+DROP INDEX IF EXISTS idx_finances_date              ON Finances;
+DROP INDEX IF EXISTS idx_venues_status              ON Venues;
+
+-- ── Index 1: Tìm kiếm sự kiện theo thời gian (dùng nhiều nhất)
+CREATE INDEX idx_events_start_time
+    ON Events(start_time);
+-- Dùng cho: SELECT ... WHERE start_time >= NOW() ORDER BY start_time
+
+-- ── Index 2: Lọc sự kiện theo trạng thái (Draft/Scheduled/Full/Completed/Cancelled)
+CREATE INDEX idx_events_status
+    ON Events(status);
+-- Dùng cho: WHERE status = 'Scheduled'
+
+-- ── Index 3: Liên kết sự kiện với ban tổ chức
+CREATE INDEX idx_events_organizer
+    ON Events(organizer_id);
+-- Dùng cho: JOIN ON organizer_id
+
+-- ── Index 4: Tìm khách theo email (unique lookup)
+CREATE INDEX idx_guests_email
+    ON Guests(email);
+-- Dùng cho: WHERE email = '...' — tìm kiếm O(1)
+
+-- ── Index 5: Tìm khách theo tên (partial scan)
+CREATE INDEX idx_guests_name
+    ON Guests(guest_name);
+-- Dùng cho: WHERE guest_name LIKE 'Nguyễn%'
+
+-- ── Index 6: Composite index — tra cứu cặp (event_id, guest_id)
+--    Tăng tốc kiểm tra đăng ký trùng và JOIN
+CREATE INDEX idx_registrations_event_guest
+    ON Registrations(event_id, guest_id);
+-- Quan trọng: bao phủ cả 2 FK hay dùng cùng nhau
+
+-- ── Index 7: Lọc đăng ký theo trạng thái tham dự
+CREATE INDEX idx_registrations_attendance
+    ON Registrations(attendance_status);
+-- Dùng cho: WHERE attendance_status = 'Attended'
+
+-- ── Index 8: Composite index tài chính — tra cứu theo sự kiện và loại
+CREATE INDEX idx_finances_event_type
+    ON Finances(event_id, type);
+-- Dùng cho: SUM(amount) WHERE event_id=X AND type='Income'
+
+-- ── Index 9: Lọc giao dịch tài chính theo ngày
+CREATE INDEX idx_finances_date
+    ON Finances(transaction_date);
+-- Dùng cho: báo cáo theo kỳ
+
+-- ── Index 10: Lọc địa điểm theo tình trạng
+CREATE INDEX idx_venues_status
+    ON Venues(availability_status);
+-- Dùng cho: WHERE availability_status = 'Available'
+
+-- Kiểm tra các index đã tạo
+SHOW INDEX FROM Events;
+SHOW INDEX FROM Registrations;
+SHOW INDEX FROM Finances;
+
+
+-- ============================================================
+-- PHẦN 2: VIEWS — Khung nhìn báo cáo
+-- Cung cấp dữ liệu sẵn sàng, Python gọi trực tiếp
+-- ============================================================
+
+DROP VIEW IF EXISTS v_upcoming_events;
+DROP VIEW IF EXISTS v_event_attendance_summary;
+DROP VIEW IF EXISTS v_finance_balance;
+DROP VIEW IF EXISTS v_guest_activity;
+DROP VIEW IF EXISTS v_venue_schedule;
+
+-- ── View 1: Sự kiện sắp diễn ra (dùng trong dashboard)
+CREATE VIEW v_upcoming_events AS
+SELECT
+    e.event_id,
+    e.event_name,
+    e.start_time,
+    e.end_time,
+    TIMESTAMPDIFF(MINUTE, e.start_time, e.end_time) AS duration_minutes,
+    v.venue_name,
+    v.capacity                                        AS venue_capacity,
+    e.max_capacity,
+    o.organizer_name,
+    e.status,
+    -- Số chỗ còn lại (NULL nếu không giới hạn)
+    CASE
+        WHEN e.max_capacity IS NULL THEN NULL
+        ELSE e.max_capacity - (
+            SELECT COUNT(*) FROM Registrations r
+            WHERE r.event_id = e.event_id
+        )
+    END AS slots_remaining
+FROM Events e
+JOIN Venues     v ON e.venue_id     = v.venue_id
+JOIN Organizers o ON e.organizer_id = o.organizer_id
+WHERE e.start_time >= NOW()
+  AND e.status IN ('Draft', 'Scheduled')
+ORDER BY e.start_time;
+
+-- ── View 2: Tổng hợp tham dự theo sự kiện
+CREATE VIEW v_event_attendance_summary AS
+SELECT
+    e.event_id,
+    e.event_name,
+    DATE_FORMAT(e.start_time, '%d/%m/%Y %H:%i') AS event_date,
+    e.status,
+    o.organizer_name,
+    COUNT(r.registration_id)                        AS total_registered,
+    COALESCE(SUM(r.attendance_status = 'Attended'),  0) AS total_attended,
+    COALESCE(SUM(r.attendance_status = 'No-show'),   0) AS total_noshow,
+    COALESCE(SUM(r.attendance_status = 'Registered'),0) AS total_pending,
+    -- Tỉ lệ tham dự thực tế
+    ROUND(
+        COALESCE(SUM(r.attendance_status = 'Attended'), 0)
+        / NULLIF(COUNT(r.registration_id), 0) * 100,
+    2) AS participation_rate_pct
+FROM Events e
+JOIN Organizers o       ON e.organizer_id = o.organizer_id
+LEFT JOIN Registrations r ON e.event_id   = r.event_id
+GROUP BY e.event_id, e.event_name, e.start_time, e.status, o.organizer_name;
+
+-- ── View 3: Số dư tài chính từng sự kiện
+CREATE VIEW v_finance_balance AS
+SELECT
+    e.event_id,
+    e.event_name,
+    e.status,
+    COALESCE(SUM(CASE WHEN f.type = 'Income'  THEN f.amount END), 0) AS total_income,
+    COALESCE(SUM(CASE WHEN f.type = 'Expense' THEN f.amount END), 0) AS total_expense,
+    COALESCE(SUM(CASE WHEN f.type = 'Income'  THEN f.amount END), 0)
+    - COALESCE(SUM(CASE WHEN f.type = 'Expense' THEN f.amount END), 0) AS net_balance,
+    COUNT(f.finance_id)                                               AS total_transactions
+FROM Events e
+LEFT JOIN Finances f ON e.event_id = f.event_id
+GROUP BY e.event_id, e.event_name, e.status;
+
+-- ── View 4: Hoạt động của khách mời
+CREATE VIEW v_guest_activity AS
+SELECT
+    g.guest_id,
+    g.guest_name,
+    g.email,
+    g.phone_number,
+    COUNT(r.registration_id)                             AS total_registrations,
+    SUM(r.attendance_status = 'Attended')                AS total_attended,
+    SUM(r.attendance_status = 'No-show')                 AS total_noshow,
+    ROUND(
+        SUM(r.attendance_status = 'Attended')
+        / NULLIF(COUNT(r.registration_id), 0) * 100,
+    1)                                                    AS personal_rate_pct,
+    MAX(r.registration_date)                             AS last_registration
+FROM Guests g
+LEFT JOIN Registrations r ON g.guest_id = r.guest_id
+GROUP BY g.guest_id, g.guest_name, g.email, g.phone_number;
+
+-- ── View 5: Lịch sử sử dụng địa điểm
+CREATE VIEW v_venue_schedule AS
+SELECT
+    v.venue_id,
+    v.venue_name,
+    v.capacity,
+    v.availability_status,
+    COUNT(e.event_id)              AS total_events_hosted,
+    SUM(e.status = 'Completed')    AS completed_events,
+    SUM(e.status = 'Scheduled')    AS upcoming_events,
+    MAX(e.start_time)              AS last_event_date,
+    -- Tỉ lệ lấp đầy trung bình
+    ROUND(AVG(
+        (SELECT COUNT(*) FROM Registrations r WHERE r.event_id = e.event_id)
+        / NULLIF(v.capacity, 0) * 100
+    ), 1)                          AS avg_fill_rate_pct
+FROM Venues v
+LEFT JOIN Events e ON v.venue_id = e.venue_id
+GROUP BY v.venue_id, v.venue_name, v.capacity, v.availability_status;
+
+-- Kiểm tra views
+SELECT 'v_upcoming_events'          AS view_name, COUNT(*) AS rows_count FROM v_upcoming_events        UNION ALL
+SELECT 'v_event_attendance_summary' AS view_name, COUNT(*) AS rows_count FROM v_event_attendance_summary UNION ALL
+SELECT 'v_finance_balance'          AS view_name, COUNT(*) AS rows_count FROM v_finance_balance         UNION ALL
+SELECT 'v_guest_activity'           AS view_name, COUNT(*) AS rows_count FROM v_guest_activity          UNION ALL
+SELECT 'v_venue_schedule'           AS view_name, COUNT(*) AS rows_count FROM v_venue_schedule;
+
+
+-- ============================================================
+-- PHẦN 3: USER DEFINED FUNCTIONS
+-- Logic tính toán tái sử dụng, gọi được từ bất kỳ SQL nào
+-- ============================================================
+
+DROP FUNCTION IF EXISTS fn_participation_rate;
+DROP FUNCTION IF EXISTS fn_event_balance;
+DROP FUNCTION IF EXISTS fn_count_registered;
+DROP FUNCTION IF EXISTS fn_slots_remaining;
+
+DELIMITER $$
+
+-- ── Function 1: Tỉ lệ tham dự (%) của một sự kiện
+--    Gọi: SELECT fn_participation_rate(1);
+CREATE FUNCTION fn_participation_rate(p_event_id INT)
+RETURNS DECIMAL(5, 2)
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE v_total    INT     DEFAULT 0;
+    DECLARE v_attended INT     DEFAULT 0;
+
+    SELECT COUNT(*)
+    INTO v_total
+    FROM Registrations
+    WHERE event_id = p_event_id;
+
+    SELECT COALESCE(SUM(attendance_status = 'Attended'), 0)
+    INTO v_attended
+    FROM Registrations
+    WHERE event_id = p_event_id;
+
+    IF v_total = 0 THEN
+        RETURN 0.00;
+    END IF;
+
+    RETURN ROUND(v_attended / v_total * 100, 2);
+END$$
+
+-- ── Function 2: Số dư tài chính của một sự kiện (Thu - Chi)
+--    Gọi: SELECT fn_event_balance(1);
+CREATE FUNCTION fn_event_balance(p_event_id INT)
+RETURNS DECIMAL(15, 2)
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE v_income  DECIMAL(15, 2) DEFAULT 0.00;
+    DECLARE v_expense DECIMAL(15, 2) DEFAULT 0.00;
+
+    SELECT COALESCE(SUM(amount), 0.00)
+    INTO v_income
+    FROM Finances
+    WHERE event_id = p_event_id AND type = 'Income';
+
+    SELECT COALESCE(SUM(amount), 0.00)
+    INTO v_expense
+    FROM Finances
+    WHERE event_id = p_event_id AND type = 'Expense';
+
+    RETURN v_income - v_expense;
+END$$
+
+-- ── Function 3: Đếm số khách đã đăng ký (trừ No-show đã hủy)
+--    Gọi: SELECT fn_count_registered(1);
+CREATE FUNCTION fn_count_registered(p_event_id INT)
+RETURNS INT
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE v_count INT DEFAULT 0;
+
+    SELECT COUNT(*)
+    INTO v_count
+    FROM Registrations
+    WHERE event_id = p_event_id;
+
+    RETURN v_count;
+END$$
+
+-- ── Function 4: Số chỗ còn trống của một sự kiện
+--    Trả về NULL nếu không giới hạn, số âm nếu đã vượt capacity
+--    Gọi: SELECT fn_slots_remaining(1);
+CREATE FUNCTION fn_slots_remaining(p_event_id INT)
+RETURNS INT
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE v_max_cap   INT DEFAULT NULL;
+    DECLARE v_registered INT DEFAULT 0;
+
+    SELECT max_capacity
+    INTO v_max_cap
+    FROM Events
+    WHERE event_id = p_event_id;
+
+    IF v_max_cap IS NULL THEN
+        RETURN NULL;   -- Không giới hạn
+    END IF;
+
+    SELECT COUNT(*)
+    INTO v_registered
+    FROM Registrations
+    WHERE event_id = p_event_id;
+
+    RETURN v_max_cap - v_registered;
+END$$
+
+DELIMITER ;
+
+-- Kiểm tra functions
+SELECT fn_participation_rate(4)  AS 'Tỉ lệ tham dự Event 4 (%)';
+SELECT fn_event_balance(1)       AS 'Số dư Event 1 (VND)';
+SELECT fn_count_registered(1)    AS 'Số đăng ký Event 1';
+SELECT fn_slots_remaining(1)     AS 'Chỗ còn trống Event 1';
+
+
+-- ============================================================
+-- PHẦN 4: STORED PROCEDURES
+-- Tự động hóa quy trình nghiệp vụ phức tạp
+-- Python gọi qua callproc() — không cần viết SQL raw
+-- ============================================================
+
+DROP PROCEDURE IF EXISTS sp_check_in_guest;
+DROP PROCEDURE IF EXISTS sp_add_finance_record;
+DROP PROCEDURE IF EXISTS sp_register_guest_safe;
+DROP PROCEDURE IF EXISTS sp_mark_event_completed;
+DROP PROCEDURE IF EXISTS sp_get_event_report;
+
+DELIMITER $$
+
+-- ── Procedure 1: Check-in khách tham dự
+--    Cập nhật attendance_status → 'Attended' + ghi checkin_time
+--    Gọi: CALL sp_check_in_guest(1, 1, @result); SELECT @result;
+CREATE PROCEDURE sp_check_in_guest(
+    IN  p_event_id INT,
+    IN  p_guest_id INT,
+    OUT p_result   VARCHAR(255)
+)
+BEGIN
+    DECLARE v_status VARCHAR(20) DEFAULT NULL;
+
+    -- Kiểm tra đăng ký tồn tại
+    SELECT attendance_status
+    INTO v_status
+    FROM Registrations
+    WHERE event_id = p_event_id AND guest_id = p_guest_id;
+
+    IF v_status IS NULL THEN
+        SET p_result = 'ERROR: Khách chưa đăng ký sự kiện này.';
+
+    ELSEIF v_status = 'Attended' THEN
+        SET p_result = 'ERROR: Khách đã check-in trước đó.';
+
+    ELSE
+        UPDATE Registrations
+        SET attendance_status = 'Attended',
+            checkin_time      = NOW()
+        WHERE event_id = p_event_id
+          AND guest_id = p_guest_id;
+
+        SET p_result = CONCAT(
+            'SUCCESS: Check-in thành công lúc ',
+            DATE_FORMAT(NOW(), '%H:%i:%s %d/%m/%Y')
+        );
+    END IF;
+END$$
+
+
+-- ── Procedure 2: Ghi nhận thu/chi tài chính
+--    Kiểm tra dữ liệu trước khi INSERT
+--    Gọi: CALL sp_add_finance_record(1,'Income',5000000,'Phí tham dự',@r); SELECT @r;
+CREATE PROCEDURE sp_add_finance_record(
+    IN  p_event_id    INT,
+    IN  p_type        ENUM('Income', 'Expense'),
+    IN  p_amount      DECIMAL(15, 2),
+    IN  p_description VARCHAR(200),
+    OUT p_result      VARCHAR(255)
+)
+BEGIN
+    DECLARE v_event_exists INT DEFAULT 0;
+
+    -- Kiểm tra sự kiện tồn tại
+    SELECT COUNT(*) INTO v_event_exists
+    FROM Events WHERE event_id = p_event_id;
+
+    IF v_event_exists = 0 THEN
+        SET p_result = 'ERROR: Sự kiện không tồn tại.';
+
+    ELSEIF p_amount <= 0 THEN
+        SET p_result = 'ERROR: Số tiền phải lớn hơn 0.';
+
+    ELSE
+        INSERT INTO Finances (event_id, type, amount, description, transaction_date)
+        VALUES (p_event_id, p_type, p_amount, p_description, CURRENT_DATE);
+
+        SET p_result = CONCAT(
+            'SUCCESS: Đã ghi ', p_type, ' ',
+            FORMAT(p_amount, 0), ' VND. ',
+            'Số dư mới: ', FORMAT(fn_event_balance(p_event_id), 0), ' VND.'
+        );
+    END IF;
+END$$
+
+
+-- ── Procedure 3: Đăng ký khách an toàn (kiểm tra đầy đủ)
+--    Gọi: CALL sp_register_guest_safe(1, 3, @result); SELECT @result;
+CREATE PROCEDURE sp_register_guest_safe(
+    IN  p_event_id INT,
+    IN  p_guest_id INT,
+    OUT p_result   VARCHAR(255)
+)
+BEGIN
+    DECLARE v_already_reg INT DEFAULT 0;
+    DECLARE v_event_status VARCHAR(20);
+    DECLARE v_slots        INT DEFAULT NULL;
+
+    -- Kiểm tra đã đăng ký chưa
+    SELECT COUNT(*) INTO v_already_reg
+    FROM Registrations
+    WHERE event_id = p_event_id AND guest_id = p_guest_id;
+
+    IF v_already_reg > 0 THEN
+        SET p_result = 'ERROR: Khách đã đăng ký sự kiện này rồi.';
+
+    ELSE
+        -- Kiểm tra trạng thái sự kiện
+        SELECT status INTO v_event_status FROM Events WHERE event_id = p_event_id;
+
+        IF v_event_status IN ('Completed', 'Cancelled') THEN
+            SET p_result = 'ERROR: Sự kiện đã kết thúc hoặc bị hủy.';
+
+        ELSEIF v_event_status = 'Full' THEN
+            SET p_result = 'ERROR: Sự kiện đã hết chỗ.';
+
+        ELSE
+            -- Kiểm tra số chỗ còn lại (dùng function)
+            SET v_slots = fn_slots_remaining(p_event_id);
+
+            IF v_slots IS NOT NULL AND v_slots <= 0 THEN
+                SET p_result = 'ERROR: Sự kiện đã hết chỗ (capacity đầy).';
+
+            ELSE
+                INSERT INTO Registrations (event_id, guest_id, registration_date, attendance_status)
+                VALUES (p_event_id, p_guest_id, CURRENT_DATE, 'Registered');
+
+                SET p_result = CONCAT(
+                    'SUCCESS: Đăng ký thành công. ',
+                    CASE WHEN v_slots IS NULL
+                         THEN 'Không giới hạn chỗ.'
+                         ELSE CONCAT('Còn ', v_slots - 1, ' chỗ trống.')
+                    END
+                );
+            END IF;
+        END IF;
+    END IF;
+END$$
+
+
+-- ── Procedure 4: Kết thúc sự kiện — cập nhật trạng thái + đánh dấu No-show
+--    Gọi: CALL sp_mark_event_completed(4, @result); SELECT @result;
+CREATE PROCEDURE sp_mark_event_completed(
+    IN  p_event_id INT,
+    OUT p_result   VARCHAR(255)
+)
+BEGIN
+    DECLARE v_noshow_count INT DEFAULT 0;
+    DECLARE v_event_name   VARCHAR(150);
+
+    SELECT event_name INTO v_event_name FROM Events WHERE event_id = p_event_id;
+
+    IF v_event_name IS NULL THEN
+        SET p_result = 'ERROR: Sự kiện không tồn tại.';
+    ELSE
+        -- Đánh dấu No-show cho khách chưa check-in
+        UPDATE Registrations
+        SET attendance_status = 'No-show'
+        WHERE event_id        = p_event_id
+          AND attendance_status = 'Registered';
+
+        SET v_noshow_count = ROW_COUNT();
+
+        -- Chuyển trạng thái sự kiện sang Completed
+        UPDATE Events SET status = 'Completed' WHERE event_id = p_event_id;
+
+        SET p_result = CONCAT(
+            'SUCCESS: Sự kiện "', v_event_name, '" đã hoàn thành. ',
+            v_noshow_count, ' khách bị đánh dấu No-show. ',
+            'Tỉ lệ tham dự: ', fn_participation_rate(p_event_id), '%.'
+        );
+    END IF;
+END$$
+
+
+-- ── Procedure 5: Báo cáo tổng hợp theo khoảng thời gian
+--    Gọi: CALL sp_get_event_report('2025-06-01','2025-09-30');
+CREATE PROCEDURE sp_get_event_report(
+    IN p_from_date DATE,
+    IN p_to_date   DATE
+)
+BEGIN
+    SELECT
+        e.event_id,
+        e.event_name,
+        DATE_FORMAT(e.start_time, '%d/%m/%Y %H:%i') AS start_time,
+        e.status,
+        v.venue_name,
+        o.organizer_name,
+        fn_count_registered(e.event_id)    AS total_registered,
+        fn_participation_rate(e.event_id)  AS participation_rate_pct,
+        fn_event_balance(e.event_id)       AS net_balance_vnd
+    FROM Events e
+    JOIN Venues     v ON e.venue_id     = v.venue_id
+    JOIN Organizers o ON e.organizer_id = o.organizer_id
+    WHERE DATE(e.start_time) BETWEEN p_from_date AND p_to_date
+    ORDER BY e.start_time;
+END$$
+
+DELIMITER ;
+
+-- Kiểm tra procedures
+CALL sp_check_in_guest(1, 1, @r1);         SELECT @r1 AS 'Kết quả check-in';
+CALL sp_add_finance_record(1,'Income',1000000,'Test thu',@r2); SELECT @r2 AS 'Kết quả tài chính';
+CALL sp_register_guest_safe(2, 3, @r3);    SELECT @r3 AS 'Kết quả đăng ký';
+CALL sp_get_event_report('2025-06-01','2025-09-30');
+
+
+-- ============================================================
+-- PHẦN 5: TRIGGERS
+-- Tự động thực thi khi có INSERT/UPDATE/DELETE
+-- ============================================================
+
+DROP TRIGGER IF EXISTS trg_check_capacity_before_register;
+DROP TRIGGER IF EXISTS trg_auto_set_full_status;
+DROP TRIGGER IF EXISTS trg_restore_available_on_cancel;
+DROP TRIGGER IF EXISTS trg_prevent_duplicate_registration;
+DROP TRIGGER IF EXISTS trg_log_checkin_timestamp;
+
+DELIMITER $$
+
+-- ── Trigger 1: BEFORE INSERT — Kiểm tra sức chứa TRƯỚC khi đăng ký
+--    "Ăn điểm" nhất: dừng insert nếu max_capacity đã đạt
+--    Demo: INSERT vào sự kiện Full → xem lỗi tự động
+CREATE TRIGGER trg_check_capacity_before_register
+BEFORE INSERT ON Registrations
+FOR EACH ROW
+BEGIN
+    DECLARE v_max_cap    INT DEFAULT NULL;
+    DECLARE v_current    INT DEFAULT 0;
+    DECLARE v_ev_status  VARCHAR(20);
+
+    -- Lấy max_capacity và status của sự kiện
+    SELECT max_capacity, status
+    INTO v_max_cap, v_ev_status
+    FROM Events
+    WHERE event_id = NEW.event_id;
+
+    -- Chặn đăng ký sự kiện đã kết thúc
+    IF v_ev_status IN ('Completed', 'Cancelled') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'TRG_ERR: Không thể đăng ký sự kiện đã kết thúc/hủy.';
+    END IF;
+
+    -- Kiểm tra sức chứa (chỉ khi max_capacity được đặt)
+    IF v_max_cap IS NOT NULL THEN
+        SELECT COUNT(*) INTO v_current
+        FROM Registrations
+        WHERE event_id = NEW.event_id;
+
+        IF v_current >= v_max_cap THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'TRG_ERR: Sự kiện đã đạt max_capacity. Đăng ký bị từ chối.';
+        END IF;
+    END IF;
+END$$
+
+
+-- ── Trigger 2: AFTER INSERT — Tự động chuyển status → 'Full'
+--    Chạy SAU khi insert thành công, cập nhật trạng thái sự kiện
+CREATE TRIGGER trg_auto_set_full_status
+AFTER INSERT ON Registrations
+FOR EACH ROW
+BEGIN
+    DECLARE v_max_cap INT DEFAULT NULL;
+    DECLARE v_current INT DEFAULT 0;
+
+    SELECT max_capacity INTO v_max_cap
+    FROM Events WHERE event_id = NEW.event_id;
+
+    IF v_max_cap IS NOT NULL THEN
+        SELECT COUNT(*) INTO v_current
+        FROM Registrations WHERE event_id = NEW.event_id;
+
+        IF v_current >= v_max_cap THEN
+            UPDATE Events
+            SET status = 'Full'
+            WHERE event_id = NEW.event_id
+              AND status IN ('Draft', 'Scheduled');
+        END IF;
+    END IF;
+END$$
+
+
+-- ── Trigger 3: AFTER DELETE — Khôi phục trạng thái 'Scheduled' khi hủy đăng ký
+--    Khi một khách hủy, nếu số đăng ký < max_capacity thì mở lại
+CREATE TRIGGER trg_restore_scheduled_on_cancel
+AFTER DELETE ON Registrations
+FOR EACH ROW
+BEGIN
+    DECLARE v_max_cap INT DEFAULT NULL;
+    DECLARE v_current INT DEFAULT 0;
+
+    SELECT max_capacity INTO v_max_cap
+    FROM Events WHERE event_id = OLD.event_id;
+
+    IF v_max_cap IS NOT NULL THEN
+        SELECT COUNT(*) INTO v_current
+        FROM Registrations WHERE event_id = OLD.event_id;
+
+        IF v_current < v_max_cap THEN
+            UPDATE Events
+            SET status = 'Scheduled'
+            WHERE event_id = OLD.event_id
+              AND status = 'Full';
+        END IF;
+    END IF;
+END$$
+
+
+-- ── Trigger 4: BEFORE INSERT — Ngăn đăng ký trùng lặp (defensive)
+--    Dù đã có UNIQUE constraint, trigger này cung cấp thông báo rõ hơn
+CREATE TRIGGER trg_prevent_duplicate_registration
+BEFORE INSERT ON Registrations
+FOR EACH ROW
+BEGIN
+    DECLARE v_exists INT DEFAULT 0;
+
+    SELECT COUNT(*) INTO v_exists
+    FROM Registrations
+    WHERE event_id = NEW.event_id
+      AND guest_id = NEW.guest_id;
+
+    IF v_exists > 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'TRG_ERR: Khách đã đăng ký sự kiện này. Không thể đăng ký lại.';
+    END IF;
+END$$
+
+
+-- ── Trigger 5: AFTER UPDATE — Ghi log khi check-in (thay đổi attendance_status)
+--    Đảm bảo checkin_time luôn được ghi khi status → Attended
+CREATE TRIGGER trg_log_checkin_timestamp
+BEFORE UPDATE ON Registrations
+FOR EACH ROW
+BEGIN
+    -- Tự động ghi thời gian check-in khi chuyển sang Attended
+    IF NEW.attendance_status = 'Attended'
+       AND OLD.attendance_status != 'Attended'
+       AND NEW.checkin_time IS NULL
+    THEN
+        SET NEW.checkin_time = NOW();
+    END IF;
+
+    -- Xóa checkin_time nếu chuyển về Registered hoặc No-show
+    IF NEW.attendance_status IN ('Registered', 'No-show')
+       AND OLD.attendance_status = 'Attended'
+    THEN
+        SET NEW.checkin_time = NULL;
+    END IF;
+END$$
+
+DELIMITER ;
+
+-- Kiểm tra triggers đã tạo
+SHOW TRIGGERS FROM event_management;
+
+
+-- ============================================================
+-- PHẦN 6: KIỂM THỬ & DEMO — Bắt buộc chụp màn hình cho báo cáo
+-- ============================================================
+
+-- ── Demo 1: fn_participation_rate
+SELECT
+    event_id,
+    event_name,
+    fn_participation_rate(event_id) AS ty_le_tham_du_pct
+FROM Events
+ORDER BY event_id;
+
+-- ── Demo 2: fn_event_balance
+SELECT
+    event_id,
+    event_name,
+    fn_event_balance(event_id) AS so_du_vnd
+FROM Events
+ORDER BY event_id;
+
+-- ── Demo 3: fn_slots_remaining
+SELECT
+    event_id,
+    event_name,
+    max_capacity,
+    fn_count_registered(event_id) AS da_dang_ky,
+    fn_slots_remaining(event_id)  AS cho_con_trong
+FROM Events
+ORDER BY event_id;
+
+-- ── Demo 4: Gọi procedure check-in
+CALL sp_check_in_guest(1, 1, @result_1); SELECT @result_1 AS 'Check-in Guest 1 - Event 1';
+CALL sp_check_in_guest(1, 1, @result_2); SELECT @result_2 AS 'Check-in lần 2 (phải báo lỗi)';
+
+-- ── Demo 5: Gọi procedure đăng ký an toàn
+CALL sp_register_guest_safe(1, 6, @reg_1); SELECT @reg_1 AS 'Đăng ký Guest 6 vào Event 1';
+
+-- ── Demo 6: Gọi procedure thêm tài chính
+CALL sp_add_finance_record(1,'Expense',2000000,'Test chi phí in ấn',@fin_1);
+SELECT @fin_1 AS 'Kết quả ghi chi';
+
+-- ── Demo 7: Trigger BEFORE INSERT — thử đăng ký khi hết chỗ
+--    Tạo sự kiện test với max_capacity=1 và đã đủ chỗ
+UPDATE Events SET max_capacity = 1 WHERE event_id = 2;
+-- Đăng ký Guest 1 vào Event 2
+CALL sp_register_guest_safe(2, 1, @trig_1); SELECT @trig_1;
+-- Đăng ký Guest 2 vào Event 2 → trigger báo lỗi hết chỗ
+CALL sp_register_guest_safe(2, 2, @trig_2); SELECT @trig_2;
+
+-- ── Demo 8: Kết thúc sự kiện tự động
+CALL sp_mark_event_completed(4, @done); SELECT @done AS 'Kết thúc Event 4';
+
+-- ── Demo 9: EXPLAIN — chứng minh index hoạt động
+EXPLAIN SELECT * FROM Events WHERE start_time >= NOW() AND status = 'Scheduled';
+EXPLAIN SELECT * FROM Guests WHERE email = 'an.nguyen@email.com';
+EXPLAIN SELECT * FROM Registrations WHERE event_id = 1 AND guest_id = 1;
+
+-- ── Demo 10: Xem các Views
+SELECT * FROM v_upcoming_events;
+SELECT * FROM v_event_attendance_summary;
+SELECT * FROM v_finance_balance;
+SELECT * FROM v_guest_activity ORDER BY total_registrations DESC;
+SELECT * FROM v_venue_schedule ORDER BY total_events_hosted DESC;
+
+-- ── Báo cáo theo kỳ
+CALL sp_get_event_report('2025-01-01', '2025-12-31');
+
+-- ============================================================
+-- END OF SCRIPT — GIAI ĐOẠN 3
+-- ============================================================
