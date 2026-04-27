@@ -11,8 +11,10 @@ from app.database import DatabaseManager
 from app.ui.components import (
     badge, section, stat_row, styled_df, show_success, show_error,
 )
+from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Đăng ký & Check-in | EMS", page_icon="✅", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -22,7 +24,7 @@ def get_db():
 db = get_db()
 
 # ── Page header ──────────────────────────────────────────────
-st.markdown("## ✅ Đăng ký & Check-in")
+st.markdown("## :material/how_to_reg: Đăng ký & Check-in")
 
 # ── Chọn sự kiện (dùng toàn trang) ─────────────────────────
 with st.spinner("Đang tải sự kiện..."):
@@ -37,12 +39,12 @@ if not ev_map:
 
 col_sel, col_refresh = st.columns([4, 1])
 selected_event_id = col_sel.selectbox(
-    "📋 Chọn sự kiện",
+    "Chọn sự kiện",
     list(ev_map.keys()),
     format_func=lambda x: ev_map[x],
     key="reg_event_sel",
 )
-if col_refresh.button("🔄 Làm mới", use_container_width=True):
+if col_refresh.button("Làm mới", icon=":material/refresh:", use_container_width=True):
     st.rerun()
 
 # Load stats for selected event
@@ -64,11 +66,11 @@ st.markdown("")
 
 # ── TABS ─────────────────────────────────────────────────────
 tab_list, tab_register, tab_checkin, tab_bulk, tab_cancel = st.tabs([
-    "📄 Danh sách đăng ký",
-    "📋 Đăng ký mới  [sp_register_guest]",
-    "✅ Check-in  [sp_guest_checkin]",
-    "🚫 No-show hàng loạt",
-    "🗑️ Hủy đăng ký",
+    ":material/list: Danh sách đăng ký",
+    ":material/person_add: Đăng ký mới",
+    ":material/check_circle: Check-in",
+    ":material/block: No-show hàng loạt",
+    ":material/delete: Hủy đăng ký",
 ])
 
 
@@ -86,7 +88,7 @@ with tab_list:
         filtered = regs if sf == "Tất cả" else [r for r in regs if r.get("attendance_status") == sf]
 
         # Render with per-row check-in button
-        section("📄", f"Danh sách — {ev_detail.get('event_name','')}", f"{len(filtered)} khách")
+        section("list", f"Danh sách — {ev_detail.get('event_name','')}", f"{len(filtered)} khách")
 
         if filtered:
             for reg in filtered:
@@ -101,7 +103,7 @@ with tab_list:
                 )
                 # Per-row check-in button (chỉ cho Registered)
                 if status == "Registered":
-                    if c5.button("✅ Check-in", key=f"ci_{reg['guest_id']}_{selected_event_id}"):
+                    if c5.button("Check-in", icon=":material/check_circle:", key=f"ci_{reg['guest_id']}_{selected_event_id}"):
                         result = db.checkin_guest(selected_event_id, reg["guest_id"])
                         if result.success:
                             show_success(result.message)
@@ -109,12 +111,12 @@ with tab_list:
                         else:
                             show_error(result.message)
                 elif status == "Attended":
-                    c5.markdown("✓ Done")
+                    c5.markdown("<span class='material-symbols-rounded' style='color:#10b981;font-size:1rem;vertical-align:middle;'>check_circle</span> Done", unsafe_allow_html=True)
 
             st.divider()
             csv = pd.DataFrame(regs).to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Tải CSV", csv,
-                               f"registrations_event_{selected_event_id}.csv", "text/csv")
+            st.download_button("Tải CSV", csv,
+                               f"registrations_event_{selected_event_id}.csv", "text/csv", icon=":material/download:")
 
 
 # ════════════════════════════════════════════════════════════
@@ -122,7 +124,7 @@ with tab_list:
 # ════════════════════════════════════════════════════════════
 with tab_register:
     section(
-        "📋", "Đăng ký khách tham dự",
+        "person_add", "Đăng ký khách tham dự",
         "Gọi sp_register_guest — tự kiểm tra trùng lặp, capacity, trạng thái"
     )
 
@@ -150,8 +152,9 @@ with tab_register:
         st.info(f"Sẽ đăng ký vào: **{ev_detail.get('event_name', '')}**")
 
         submitted_reg = st.form_submit_button(
-            "📋 Đăng ký ngay  [sp_register_guest]",
-            type="primary", use_container_width=True,
+            "Đăng ký ngay [sp_register_guest]",
+            icon=":material/app_registration:",
+            use_container_width=True,
         )
 
     if submitted_reg:
@@ -168,7 +171,7 @@ with tab_register:
     st.markdown("**Hoặc nhập Guest ID trực tiếp:**")
     c1, c2 = st.columns([2, 1])
     manual_gid = c1.number_input("Guest ID", min_value=1, step=1, key="reg_manual_gid")
-    if c2.button("📋 Đăng ký", key="reg_manual_btn", type="primary", use_container_width=True):
+    if c2.button("Đăng ký", icon=":material/app_registration:", key="reg_manual_btn", use_container_width=True):
         with st.spinner("Đang gọi sp_register_guest..."):
             result = db.register_guest(selected_event_id, int(manual_gid))
         if result.success:
@@ -183,7 +186,7 @@ with tab_register:
 # ════════════════════════════════════════════════════════════
 with tab_checkin:
     section(
-        "✅", "Check-in khách",
+        "check_circle", "Check-in khách",
         "Gọi sp_guest_checkin — cập nhật attendance_status + ghi checkin_time"
     )
 
@@ -197,7 +200,7 @@ with tab_checkin:
             c1, c2, c3 = st.columns([3, 3, 1])
             c1.markdown(f"**{p['guest_name']}**")
             c2.markdown(p.get("email", ""))
-            if c3.button("✅", key=f"qci_{p['guest_id']}", help="Check-in ngay"):
+            if c3.button("Check-in", icon=":material/check_circle:", key=f"qci_{p['guest_id']}", help="Check-in ngay"):
                 result = db.checkin_guest(selected_event_id, p["guest_id"])
                 if result.success:
                     show_success(f"Check-in: {p['guest_name']}")
@@ -212,7 +215,7 @@ with tab_checkin:
     st.markdown("**Check-in theo Guest ID:**")
     c1, c2 = st.columns([2, 1])
     ci_gid = c1.number_input("Guest ID", min_value=1, step=1, key="ci_manual_gid")
-    if c2.button("✅ Check-in", type="primary", use_container_width=True, key="ci_manual_btn"):
+    if c2.button("Check-in", icon=":material/check_circle:", use_container_width=True, key="ci_manual_btn"):
         with st.spinner("Đang gọi sp_guest_checkin..."):
             result = db.checkin_guest(selected_event_id, int(ci_gid))
         if result.success:
@@ -226,7 +229,7 @@ with tab_checkin:
 # TAB 4: NO-SHOW HÀNG LOẠT
 # ════════════════════════════════════════════════════════════
 with tab_bulk:
-    section("🚫", "Đánh dấu No-show hàng loạt",
+    section("block", "Đánh dấu No-show hàng loạt",
             "Dùng sau khi sự kiện kết thúc — tất cả 'Registered' chưa check-in sẽ thành No-show")
 
     pending_count = stats_ev.get("registered", 0)
@@ -238,17 +241,16 @@ with tab_bulk:
             f"sẽ bị chuyển thành 'No-show'."
         )
         confirm_ns = st.checkbox("Xác nhận đánh dấu No-show hàng loạt", key="confirm_noshow")
-        if st.button("🚫 Thực hiện No-show", type="primary", disabled=not confirm_ns):
+        if st.button("Thực hiện No-show", icon=":material/block:", disabled=not confirm_ns):
             with st.spinner("Đang cập nhật..."):
                 rows = db.registrations.mark_noshow_bulk(selected_event_id)
             show_success(f"Đã đánh dấu {rows} khách là No-show.")
             st.rerun()
 
     st.divider()
-    section("🏁", "Kết thúc sự kiện", "Gọi sp_mark_event_completed — tự động No-show + cập nhật status")
+    section("flag", "Kết thúc sự kiện", "Gọi sp_mark_event_completed — tự động No-show + cập nhật status")
     confirm_done = st.checkbox("Xác nhận kết thúc sự kiện", key="confirm_done_ev")
-    if st.button("🏁 Kết thúc sự kiện  [sp_mark_event_completed]",
-                 type="primary", disabled=not confirm_done):
+    if st.button("Kết thúc sự kiện [sp_mark_event_completed]", icon=":material/flag:", disabled=not confirm_done):
         with st.spinner("Đang gọi sp_mark_event_completed..."):
             result = db.complete_event(selected_event_id)
         if result.success:
@@ -262,7 +264,7 @@ with tab_bulk:
 # TAB 5: HỦY ĐĂNG KÝ
 # ════════════════════════════════════════════════════════════
 with tab_cancel:
-    section("🗑️", "Hủy đăng ký", "Xóa hoàn toàn bản ghi đăng ký")
+    section("delete", "Hủy đăng ký", "Xóa hoàn toàn bản ghi đăng ký")
 
     if not regs:
         st.info("Không có đăng ký nào để hủy.")
@@ -284,7 +286,7 @@ with tab_cancel:
             )
 
         confirm_c = st.checkbox("Xác nhận hủy đăng ký này", key="confirm_cancel_reg")
-        if st.button("🗑️ Hủy đăng ký", type="primary", disabled=not confirm_c):
+        if st.button("Hủy đăng ký", icon=":material/delete:", disabled=not confirm_c):
             rows = db.registrations.cancel_by_id(cancel_id)
             if rows:
                 show_success(f"Đã hủy đăng ký #{cancel_id}!")

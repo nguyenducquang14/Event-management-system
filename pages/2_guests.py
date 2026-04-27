@@ -12,8 +12,10 @@ from app.ui.components import (
     section, stat_row, styled_df,
     show_success, show_error, search_bar,
 )
+from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Khách mời | EMS", page_icon="👥", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -24,12 +26,12 @@ db = get_db()
 
 # ── Page header ──────────────────────────────────────────────
 c_title, c_btn = st.columns([4, 1])
-c_title.markdown("## 👥 Quản lý Khách mời")
-add_new = c_btn.button("➕ Thêm khách mới", type="primary", use_container_width=True)
+c_title.markdown("## :material/group: Quản lý Khách mời")
+add_new = c_btn.button("Thêm khách mới", icon=":material/add:", use_container_width=True)
 
 # ── Search bar (realtime) ────────────────────────────────────
 kw = st.text_input(
-    "🔍",
+    "Tìm kiếm",
     placeholder="Tìm theo tên hoặc email...",
     key="guest_search",
     label_visibility="collapsed",
@@ -58,7 +60,7 @@ st.markdown("")
 
 # ── TABS ─────────────────────────────────────────────────────
 tab_list, tab_activity, tab_add, tab_edit, tab_delete = st.tabs([
-    "📄 Danh sách", "🏆 Hoạt động", "➕ Thêm mới", "✏️ Sửa thông tin", "🗑️ Xóa"
+    ":material/list: Danh sách", ":material/emoji_events: Hoạt động", ":material/person_add: Thêm mới", ":material/edit: Sửa thông tin", ":material/delete: Xóa"
 ])
 
 
@@ -69,54 +71,23 @@ with tab_list:
     if not guests:
         st.info("Không tìm thấy khách nào.")
     else:
-        # st.data_editor cho phép sửa trực tiếp
-        section("📄", "Danh sách khách mời", "Có thể chỉnh sửa trực tiếp trong bảng")
+        section("list", "Danh sách khách mời", "Chuyển sang tab 'Sửa thông tin' để cập nhật dữ liệu")
 
         df_guests = pd.DataFrame(guests)
         keep_cols = [c for c in
                      ["guest_id","guest_name","email","phone_number","address","created_at"]
                      if c in df_guests.columns]
-        df_display = df_guests[keep_cols].copy()
+        
+        df_display = df_guests[keep_cols].rename(columns={
+            "guest_id": "ID", "guest_name": "Họ tên",
+            "email": "Email", "phone_number": "Điện thoại",
+            "address": "Địa chỉ", "created_at": "Tạo lúc"
+        })
 
-        edited = st.data_editor(
-            df_display,
-            use_container_width=True,
-            hide_index=True,
-            height=420,
-            num_rows="fixed",
-            column_config={
-                "guest_id":    st.column_config.NumberColumn("ID",       disabled=True, width="small"),
-                "guest_name":  st.column_config.TextColumn("Họ tên",     width="medium"),
-                "email":       st.column_config.TextColumn("Email",      width="medium"),
-                "phone_number":st.column_config.TextColumn("Điện thoại", width="small"),
-                "address":     st.column_config.TextColumn("Địa chỉ",   width="large"),
-                "created_at":  st.column_config.DatetimeColumn("Tạo lúc",disabled=True,width="small"),
-            },
-            key="guest_editor",
-        )
-
-        # Save inline edits
-        if st.button("💾 Lưu chỉnh sửa trực tiếp", key="save_inline_guest"):
-            changed = 0
-            for _, row in edited.iterrows():
-                try:
-                    db.guests.update(
-                        int(row["guest_id"]),
-                        GuestCreate(
-                            guest_name=row["guest_name"],
-                            email=row["email"],
-                            phone_number=row.get("phone_number") or None,
-                            address=row.get("address") or None,
-                        ),
-                    )
-                    changed += 1
-                except Exception:
-                    pass
-            show_success(f"Đã lưu thay đổi cho {changed} khách mời.")
-            st.rerun()
+        styled_df(df_display.to_dict("records"), height=420)
 
         csv = df_display.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Tải CSV", csv, "guests.csv", "text/csv")
+        st.download_button("Tải CSV", csv, "guests.csv", "text/csv", icon=":material/download:")
 
 
 # ════════════════════════════════════════════════════════════
@@ -125,7 +96,7 @@ with tab_list:
 with tab_activity:
     import plotly.express as px
 
-    section("🏆", "Top khách tích cực", "Khách tham dự nhiều sự kiện nhất")
+    section("emoji_events", "Top khách tích cực", "Khách tham dự nhiều sự kiện nhất")
     top_n = st.slider("Hiển thị top", 5, 30, 10, key="guest_top_n")
 
     with st.spinner():
@@ -143,11 +114,20 @@ with tab_activity:
                     "personal_rate_pct": "Tỉ lệ (%)"},
             height=320,
         )
+        fig.update_traces(textfont_color="#000000")
         fig.update_layout(
-            margin=dict(l=0, r=0, t=10, b=60),
+            margin=dict(l=0, r=0, t=10, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=-30),
+            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
+            coloraxis_colorbar=dict(
+                x=1.05,
+                titlefont=dict(color="#000000"),
+                tickfont=dict(color="#000000")
+            )
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -158,7 +138,7 @@ with tab_activity:
 
     # Chi tiết một khách
     st.divider()
-    section("🔍", "Lịch sử sự kiện của một khách")
+    section("history", "Lịch sử sự kiện của một khách")
     if guests:
         guest_map = {g["guest_id"]: f"#{g['guest_id']} {g['guest_name']}" for g in guests}
         sel_g = st.selectbox("Chọn khách", list(guest_map.keys()),
@@ -174,7 +154,7 @@ with tab_activity:
 # TAB 3: THÊM MỚI
 # ════════════════════════════════════════════════════════════
 with tab_add:
-    section("➕", "Thêm khách mời mới")
+    section("person_add", "Thêm khách mời mới")
 
     with st.form("form_add_guest", clear_on_submit=True):
         name  = st.text_input("Họ tên *")
@@ -184,7 +164,7 @@ with tab_add:
         addr  = c2.text_input("Địa chỉ")
 
         col_btn, _ = st.columns([1, 3])
-        submitted = col_btn.form_submit_button("➕ Thêm khách", type="primary", use_container_width=True)
+        submitted = col_btn.form_submit_button("Thêm khách", icon=":material/add:", use_container_width=True)
 
     if submitted:
         if not name or not email:
@@ -210,7 +190,7 @@ with tab_add:
     if uploaded:
         df_up = pd.read_csv(uploaded)
         st.dataframe(df_up.head(), use_container_width=True)
-        if st.button("📥 Import tất cả", type="primary"):
+        if st.button("Import tất cả", icon=":material/upload:"):
             ok, fail = 0, 0
             for _, row in df_up.iterrows():
                 try:
@@ -231,7 +211,7 @@ with tab_add:
 # TAB 4: SỬA THÔNG TIN
 # ════════════════════════════════════════════════════════════
 with tab_edit:
-    section("✏️", "Sửa thông tin khách mời")
+    section("edit", "Sửa thông tin khách mời")
 
     if not guests:
         st.info("Không có khách nào.")
@@ -251,7 +231,7 @@ with tab_edit:
             c1, c2 = st.columns(2)
             phone_u = c1.text_input("Điện thoại",  value=g_cur.get("phone_number", "") or "")
             addr_u  = c2.text_input("Địa chỉ",     value=g_cur.get("address", "") or "")
-            saved = st.form_submit_button("💾 Lưu thay đổi", type="primary", use_container_width=True)
+            saved = st.form_submit_button("Lưu thay đổi", icon=":material/save:", use_container_width=True)
 
         if saved:
             try:
@@ -272,7 +252,7 @@ with tab_edit:
 # TAB 5: XÓA
 # ════════════════════════════════════════════════════════════
 with tab_delete:
-    section("🗑️", "Xóa khách mời", "Xóa cascade toàn bộ lịch sử đăng ký của khách này")
+    section("delete", "Xóa khách mời", "Xóa cascade toàn bộ lịch sử đăng ký của khách này")
 
     if not guests:
         st.info("Không có khách nào.")
@@ -289,7 +269,7 @@ with tab_delete:
             st.warning(f"⚠️ Sẽ xóa: **{g_del['guest_name']}** — {g_del['email']}")
 
         confirm_g = st.checkbox("Xác nhận muốn xóa khách này", key="confirm_del_guest")
-        if st.button("🗑️ Xóa vĩnh viễn", type="primary", disabled=not confirm_g):
+        if st.button("Xóa vĩnh viễn", icon=":material/delete_forever:", disabled=not confirm_g):
             db.guests.delete(del_gid)
             show_success(f"Đã xóa khách #{del_gid}!")
             st.rerun()

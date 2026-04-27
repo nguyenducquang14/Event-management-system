@@ -1,0 +1,7 @@
+[theme]
+# Ép Streamlit sử dụng bộ màu cơ sở là Light (sáng) để bảng vẽ chữ đen
+base = "light"
+# Màu nền chính của ứng dụng
+backgroundColor = "#F8FAFC"
+# Màu chữ chính
+textColor = "#000000"

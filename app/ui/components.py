@@ -41,12 +41,12 @@ def badge(text: str) -> str:
 # ── Notification helpers ─────────────────────────────────────
 
 def show_success(msg: str):
-    st.toast(f"✓  {msg}", icon="✅")
-    st.success(f"✓  {msg}")
+    st.toast(f"Thành công: {msg}", icon=":material/check_circle:")
+    st.success(msg, icon=":material/check_circle:")
 
 def show_error(msg: str):
-    st.toast(f"✗  {msg}", icon="❌")
-    st.error(f"✗  {msg}")
+    st.toast(f"Lỗi: {msg}", icon=":material/error:")
+    st.error(msg, icon=":material/error:")
 
 def show_result(message: str, success: bool):
     if success:
@@ -59,7 +59,7 @@ def show_result(message: str, success: bool):
 
 def search_bar(placeholder: str = "Tìm kiếm...", key: str = "search") -> str:
     return st.text_input(
-        "🔍", placeholder=placeholder, key=key, label_visibility="collapsed"
+        "Tìm kiếm", placeholder=placeholder, key=key, label_visibility="collapsed"
     )
 
 
@@ -70,9 +70,9 @@ def section(icon: str, title: str, subtitle: str = ""):
         f'<div style="display:flex;align-items:center;gap:.5rem;'
         f'margin:1.2rem 0 .6rem;padding-bottom:.5rem;'
         f'border-bottom:2px solid #e5e7f0">'
-        f'<span style="font-size:1.1rem">{icon}</span>'
-        f'<div><div style="font-size:.95rem;font-weight:600;color:#1f2937">{title}</div>'
-        f'{"" if not subtitle else f"<div style=font-size:.72rem;color:#6b7280>{subtitle}</div>"}'
+        f'<span class="material-symbols-rounded" style="font-size:1.4rem; color:#4f46e5">{icon}</span>'
+        f'<div><div style="font-size:.95rem;font-weight:600;color:#000000">{title}</div>'
+        f'{"" if not subtitle else f"<div style=font-size:.72rem;color:#000000>{subtitle}</div>"}'
         f'</div></div>',
         unsafe_allow_html=True,
     )
@@ -93,8 +93,8 @@ def stat_row(items: list[tuple[str, Any, str]]):
         col.markdown(
             f'<div style="background:{bg};border-radius:10px;padding:.75rem 1rem;text-align:center">'
             f'<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;'
-            f'letter-spacing:.6px;color:{fg};margin-bottom:.2rem">{label}</div>'
-            f'<div style="font-size:1.4rem;font-weight:700;color:{fg}">{value}</div>'
+            f'letter-spacing:.6px;color:#000000;margin-bottom:.2rem">{label}</div>'
+            f'<div style="font-size:1.4rem;font-weight:700;color:#000000">{value}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -124,20 +124,17 @@ def styled_df(
         return
 
     df = pd.DataFrame(data)
-
-    if not badge_cols:
-        st.dataframe(df, use_container_width=True, hide_index=True, height=height)
-        return
+    badge_cols = badge_cols or []
 
     # Build HTML table with badges
     headers = list(df.columns)
-    html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
+    html = f'<div style="overflow-x:auto;max-height:{height}px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:.78rem">'
     html += "<thead><tr>"
     for h in headers:
         html += (
             f'<th style="padding:.5rem .7rem;background:#f9fafb;'
             f'border-bottom:2px solid #e5e7f0;text-align:left;'
-            f'color:#6b7280;font-size:.68rem;text-transform:uppercase;'
+            f'color:#000000;font-size:.68rem;text-transform:uppercase;'
             f'letter-spacing:.5px;white-space:nowrap">{h}</th>'
         )
     html += "</tr></thead><tbody>"
@@ -155,7 +152,7 @@ def styled_df(
             html += (
                 f'<td style="padding:.45rem .7rem;'
                 f'border-bottom:1px solid #f3f4f6;'
-                f'color:#374151;vertical-align:middle">{cell}</td>'
+                f'color:#000000;vertical-align:middle">{cell}</td>'
             )
         html += "</tr>"
 

@@ -12,8 +12,10 @@ from datetime import date, timedelta
 
 from app.database import DatabaseManager
 from app.ui.components import section, stat_row, styled_df, show_success
+from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Báo cáo | EMS", page_icon="📊", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -28,7 +30,7 @@ def get_engine():
 db  = get_db()
 eng = get_engine()
 
-st.markdown("## 📊 Báo cáo & Thống kê")
+st.markdown("## :material/analytics: Báo cáo & Thống kê")
 
 # ── Load dashboard stats ─────────────────────────────────────
 with st.spinner("Đang tải số liệu..."):
@@ -48,8 +50,8 @@ st.markdown("")
 # ── TABS ─────────────────────────────────────────────────────
 (tab_event, tab_guest, tab_venue,
  tab_finance, tab_period, tab_excel) = st.tabs([
-    "📋 Sự kiện", "🏆 Top khách", "🏢 Địa điểm",
-    "💰 Tài chính", "📅 Báo cáo kỳ", "📥 Xuất Excel",
+    ":material/event: Sự kiện", ":material/emoji_events: Top khách", ":material/apartment: Địa điểm",
+    ":material/payments: Tài chính", ":material/calendar_month: Báo cáo kỳ", ":material/download: Xuất Excel",
 ])
 
 
@@ -57,7 +59,7 @@ st.markdown("")
 # TAB 1: SỰ KIỆN
 # ════════════════════════════════════════════════════════════
 with tab_event:
-    section("📋", "Thống kê tổng hợp sự kiện")
+    section("bar_chart", "Thống kê tổng hợp sự kiện")
 
     with st.spinner():
         summary = db.events.get_summary()
@@ -75,9 +77,9 @@ with tab_event:
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=avg_rate,
-                title={"text": "Tỉ lệ tham dự TB (%)"},
+                title={"text": "Tỉ lệ tham dự TB (%)", "font": {"color": "#000000"}},
                 gauge={
-                    "axis": {"range": [0, 100]},
+                    "axis": {"range": [0, 100], "tickfont": {"color": "#000000"}},
                     "bar":  {"color": "#6366f1"},
                     "steps": [
                         {"range": [0,  40], "color": "#fee2e2"},
@@ -87,12 +89,13 @@ with tab_event:
                     "threshold": {"line": {"color": "#1f2937", "width": 3},
                                   "thickness": 0.75, "value": avg_rate},
                 },
-                number={"suffix": "%", "font": {"size": 36}},
+                number={"suffix": "%", "font": {"size": 36, "color": "#000000"}},
             ))
             fig_gauge.update_layout(
                 height=240,
                 margin=dict(l=20, r=20, t=40, b=10),
                 paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#000000"),
             )
             st.plotly_chart(fig_gauge, use_container_width=True)
 
@@ -117,25 +120,29 @@ with tab_event:
                    - df_s["total_noshow"].astype(float),
                 marker_color="#c7d2fe",
             )
+            fig_bar.update_traces(textfont_color="#000000")
             fig_bar.update_layout(
                 barmode="stack", height=240,
-                legend=dict(orientation="h", y=-0.3),
-                margin=dict(l=0, r=0, t=10, b=60),
+                legend=dict(orientation="v", font=dict(color="#000000")),
+                margin=dict(l=0, r=0, t=10, b=30),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(tickangle=-30),
+                xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+                yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+                font=dict(color="#000000"),
+                hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
             )
             st.plotly_chart(fig_bar, use_container_width=True)
 
         st.divider()
-        st.dataframe(df_s, use_container_width=True, hide_index=True, height=300)
+        styled_df(summary, height=300)
 
 
 # ════════════════════════════════════════════════════════════
 # TAB 2: TOP KHÁCH
 # ════════════════════════════════════════════════════════════
 with tab_guest:
-    section("🏆", "Top khách tích cực nhất")
+    section("emoji_events", "Top khách tích cực nhất")
 
     col_sl, col_sort = st.columns([2, 2])
     top_n    = col_sl.slider("Hiển thị top", 5, 50, 15, key="rpt_top_n")
@@ -160,49 +167,62 @@ with tab_guest:
                     "personal_rate_pct": "Tỉ lệ (%)"},
             height=max(300, top_n * 28),
         )
+        fig_h.update_traces(textfont_color="#000000")
         fig_h.update_layout(
             margin=dict(l=0, r=0, t=10, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(autorange="reversed"),
+            xaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(autorange="reversed", color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
+            coloraxis_colorbar=dict(
+                titlefont=dict(color="#000000"),
+                tickfont=dict(color="#000000")
+            )
         )
         st.plotly_chart(fig_h, use_container_width=True)
 
         styled_df(activity, height=300)
 
         csv = df_a.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Tải CSV", csv, "top_guests.csv", "text/csv")
+        st.download_button("Tải CSV", csv, "top_guests.csv", "text/csv", icon=":material/download:")
 
 
 # ════════════════════════════════════════════════════════════
 # TAB 3: ĐỊA ĐIỂM
 # ════════════════════════════════════════════════════════════
 with tab_venue:
-    section("🏢", "Thống kê sử dụng địa điểm")
+    section("apartment", "Thống kê sử dụng địa điểm")
 
     with st.spinner():
-        venues = db.events.execute_query("SELECT * FROM v_venue_schedule") or []
+        venues = db.events.execute_query("SELECT * FROM view_venue_usage") or []
 
     if venues:
         df_v = pd.DataFrame(venues)
-
-        # Bubble chart: capacity vs events_hosted, size = avg_fill_rate
-        fig_bubble = px.scatter(
+        
+        # Bar chart: venue vs total events
+        fig_bar_v = px.bar(
             df_v,
-            x="total_events_hosted", y="capacity",
-            size="avg_fill_rate_pct" if "avg_fill_rate_pct" in df_v.columns else "total_events_hosted",
-            color="availability_status" if "availability_status" in df_v.columns else None,
-            text="venue_name",
-            labels={"total_events_hosted": "Số sự kiện", "capacity": "Sức chứa"},
+            x="venue_name", y="total_events",
+            color="availability_status",
+            labels={"venue_name": "Địa điểm", "total_events": "Số sự kiện", "availability_status": "Trạng thái"},
             height=380,
-            title="Sức chứa vs Số sự kiện (size = tỉ lệ lấp đầy TB)",
+            title="Số lượng sự kiện theo địa điểm",
         )
-        fig_bubble.update_traces(textposition="top center")
-        fig_bubble.update_layout(
+        fig_bar_v.update_traces(textfont_color="#000000")
+        fig_bar_v.update_layout(
             margin=dict(l=0, r=0, t=40, b=20),
             paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
+            legend=dict(font=dict(color="#000000")),
+            title=dict(font=dict(color="#000000")),
         )
-        st.plotly_chart(fig_bubble, use_container_width=True)
+        st.plotly_chart(fig_bar_v, use_container_width=True)
 
         styled_df(venues, badge_cols=["availability_status"], height=280)
     else:
@@ -213,7 +233,7 @@ with tab_venue:
 # TAB 4: TÀI CHÍNH
 # ════════════════════════════════════════════════════════════
 with tab_finance:
-    section("💰", "Báo cáo tài chính tổng hợp")
+    section("payments", "Báo cáo tài chính tổng hợp")
 
     with st.spinner():
         fin_report = db.finances.get_all_report()
@@ -222,26 +242,28 @@ with tab_finance:
     if fin_balance:
         df_bal = pd.DataFrame(fin_balance)
 
-        # Waterfall chart: net balance per event
-        fig_wf = go.Figure(go.Waterfall(
-            name="Số dư",
-            orientation="v",
-            measure=["relative"] * len(df_bal),
+        # Bar chart: net balance per event
+        colors = ["#34d399" if float(v) >= 0 else "#f87171" for v in df_bal["net_balance"]]
+        fig_bal_bar = go.Figure(go.Bar(
             x=df_bal["event_name"].str[:18],
             y=df_bal["net_balance"].astype(float),
-            connector={"line": {"color": "#9ca3af", "width": 1}},
-            increasing={"marker": {"color": "#34d399"}},
-            decreasing={"marker": {"color": "#f87171"}},
+            marker_color=colors,
+            text=df_bal["net_balance"].astype(float).apply(lambda x: f"{x/1e6:+.1f}M"),
+            textposition="auto"
         ))
-        fig_wf.update_layout(
-            title="Số dư ròng theo sự kiện (Waterfall)",
+        fig_bal_bar.update_traces(textfont_color="#000000")
+        fig_bal_bar.update_layout(
+            title=dict(text="Số dư ròng theo sự kiện", font=dict(color="#000000")),
             height=320,
             margin=dict(l=0, r=0, t=40, b=60),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=-30),
+            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
         )
-        st.plotly_chart(fig_wf, use_container_width=True)
+        st.plotly_chart(fig_bal_bar, use_container_width=True)
 
         styled_df(fin_balance, height=260)
     else:
@@ -252,13 +274,13 @@ with tab_finance:
 # TAB 5: BÁO CÁO KỲ
 # ════════════════════════════════════════════════════════════
 with tab_period:
-    section("📅", "Báo cáo sự kiện theo khoảng thời gian",
+    section("calendar_month", "Báo cáo sự kiện theo khoảng thời gian",
             "Gọi sp_event_report")
 
     col1, col2, col3 = st.columns([2, 2, 1])
     from_d = col1.date_input("Từ ngày", value=date.today() - timedelta(days=180))
     to_d   = col2.date_input("Đến ngày", value=date.today() + timedelta(days=180))
-    run    = col3.button("🔍 Xem", type="primary", use_container_width=True, key="rpt_period_btn")
+    run    = col3.button("Xem", icon=":material/search:", use_container_width=True, key="rpt_period_btn")
 
     if run:
         with st.spinner("Đang gọi sp_event_report..."):
@@ -266,7 +288,7 @@ with tab_period:
         if rows:
             df_r = pd.DataFrame(rows)
             st.caption(f"Tìm thấy {len(rows)} sự kiện từ {from_d} đến {to_d}")
-            st.dataframe(df_r, use_container_width=True, hide_index=True, height=350)
+            styled_df(rows, height=350)
 
             # Mini charts
             if "total_attended" in df_r.columns:
@@ -275,14 +297,21 @@ with tab_period:
                     barmode="overlay", height=260,
                     labels={"event_name":"Sự kiện","value":"Số người"},
                 )
+                fig_mini.update_traces(textfont_color="#000000")
                 fig_mini.update_layout(
-                    margin=dict(l=0,r=0,t=10,b=60), xaxis=dict(tickangle=-30),
-                    paper_bgcolor="rgba(0,0,0,0)", legend=dict(orientation="h",y=-0.4),
+                    margin=dict(l=0,r=0,t=10,b=60), 
+                    xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+                    yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+                    paper_bgcolor="rgba(0,0,0,0)", 
+                    plot_bgcolor="rgba(0,0,0,0)", 
+                    legend=dict(orientation="h", y=-0.4, font=dict(color="#000000")),
+                    font=dict(color="#000000"),
+                    hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
                 )
                 st.plotly_chart(fig_mini, use_container_width=True)
 
             csv = df_r.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Tải CSV kỳ này", csv, f"report_{from_d}_{to_d}.csv", "text/csv")
+            st.download_button("Tải CSV kỳ này", csv, f"report_{from_d}_{to_d}.csv", "text/csv", icon=":material/download:")
         else:
             st.info("Không có sự kiện nào trong khoảng này.")
 
@@ -291,7 +320,7 @@ with tab_period:
 # TAB 6: XUẤT EXCEL
 # ════════════════════════════════════════════════════════════
 with tab_excel:
-    section("📥", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
+    section("download", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
     from sqlalchemy import text as sqlt
 
     SHEET_QUERIES = {
@@ -318,7 +347,7 @@ with tab_excel:
     col_fmt, col_btn = st.columns([2, 1])
     include_summary = col_fmt.checkbox("Thêm sheet 'Tổng quan' đầu tiên", value=True)
 
-    if col_btn.button("📥 Tạo file Excel", type="primary", use_container_width=True) and selected_sheets:
+    if col_btn.button("Tạo file Excel", icon=":material/description:", use_container_width=True) and selected_sheets:
         buf = io.BytesIO()
         with st.spinner("Đang tạo Excel..."):
             with pd.ExcelWriter(buf, engine="openpyxl") as writer:
@@ -355,9 +384,10 @@ with tab_excel:
         fname = f"EMS_Report_{ts}.xlsx"
 
         st.download_button(
-            "⬇️ Tải file Excel",
+            "Tải file Excel",
             data=buf.getvalue(),
             file_name=fname,
+            icon=":material/download:",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
@@ -371,4 +401,4 @@ with tab_excel:
         st.markdown("**Preview — Tổng hợp sự kiện:**")
         preview = db.events.get_summary()
         if preview:
-            st.dataframe(pd.DataFrame(preview).head(5), use_container_width=True, hide_index=True)
+            styled_df(preview[:5], height=200)

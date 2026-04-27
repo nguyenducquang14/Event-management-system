@@ -13,8 +13,10 @@ from app.database import DatabaseManager
 from app.ui.components import (
     section, stat_row, styled_df, show_success, show_error,
 )
+from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Tài chính | EMS", page_icon="💰", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -43,11 +45,11 @@ st.markdown("")
 
 # ── Tabs ─────────────────────────────────────────────────────
 tab_overview, tab_income, tab_expense, tab_detail, tab_period = st.tabs([
-    "📊 Tổng hợp",
-    "💚 Ghi thu nhập  [sp_add_finance_record]",
-    "🔴 Ghi chi phí  [sp_add_finance_record]",
-    "🔍 Chi tiết sự kiện",
-    "📅 Báo cáo kỳ",
+    ":material/analytics: Tổng hợp",
+    ":material/add_circle: Ghi thu nhập",
+    ":material/remove_circle: Ghi chi phí",
+    ":material/info: Chi tiết sự kiện",
+    ":material/calendar_month: Báo cáo kỳ",
 ])
 
 
@@ -62,7 +64,7 @@ with tab_overview:
         c_chart, c_table = st.columns([3, 2])
 
         with c_chart:
-            section("📊", "Thu − Chi − Số dư theo sự kiện")
+            section("bar_chart", "Thu − Chi − Số dư theo sự kiện")
             names = df_b["event_name"].str[:18]
             fig = go.Figure()
             fig.add_bar(name="Thu (Income)", x=names,
@@ -74,19 +76,23 @@ with tab_overview:
                             mode="lines+markers",
                             line=dict(color="#6366f1", width=2.5),
                             yaxis="y2")
+            fig.update_traces(textfont_color="#000000")
             fig.update_layout(
                 barmode="group", height=340,
-                yaxis2=dict(overlaying="y", side="right"),
-                legend=dict(orientation="h", y=-0.3),
+                yaxis2=dict(overlaying="y", side="right", color="#000000", tickfont=dict(color="#000000")),
+                legend=dict(orientation="v", x=1.15, font=dict(color="#000000")),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0, r=0, t=10, b=70),
-                xaxis=dict(tickangle=-30),
+                margin=dict(l=0, r=0, t=10, b=30),
+                xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+                yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+                font=dict(color="#000000"),
+                hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
             )
             st.plotly_chart(fig, use_container_width=True)
 
         with c_table:
-            section("📋", "Bảng số dư từng sự kiện")
+            section("table_view", "Bảng số dư từng sự kiện")
             disp = [{
                 "Sự kiện":   str(b["event_name"])[:30],
                 "Thu (M)":   f"{float(b['total_income'])/1e6:.1f}",
@@ -94,8 +100,7 @@ with tab_overview:
                 "Số dư (M)": f"{float(b['net_balance'])/1e6:+.1f}",
                 "GD":        b.get("total_transactions", 0),
             } for b in balances]
-            st.dataframe(pd.DataFrame(disp), use_container_width=True,
-                         hide_index=True, height=320)
+            styled_df(disp, height=320)
 
 
 # ════════════════════════════════════════════════════════════
@@ -110,7 +115,7 @@ def _load_event_select():
 # TAB 2: GHI THU NHẬP
 # ════════════════════════════════════════════════════════════
 with tab_income:
-    section("💚", "Ghi nhận thu nhập", "Gọi sp_add_finance_record với type='Income'")
+    section("add_circle", "Ghi nhận thu nhập", "Gọi sp_add_finance_record với type='Income'")
 
     ev_map_i = _load_event_select()
 
@@ -148,8 +153,9 @@ with tab_income:
             placeholder="Phí tài trợ, phí đăng ký...",
         )
         submitted_inc = st.form_submit_button(
-            "💚 Ghi thu nhập  [sp_add_finance_record]",
-            type="primary", use_container_width=True,
+            "Ghi thu nhập [sp_add_finance_record]",
+            icon=":material/add_circle:",
+            use_container_width=True,
         )
 
     if submitted_inc:
@@ -171,7 +177,7 @@ with tab_income:
 # TAB 3: GHI CHI PHÍ
 # ════════════════════════════════════════════════════════════
 with tab_expense:
-    section("🔴", "Ghi nhận chi phí", "Gọi sp_add_finance_record với type='Expense'")
+    section("remove_circle", "Ghi nhận chi phí", "Gọi sp_add_finance_record với type='Expense'")
 
     ev_map_e = _load_event_select()
 
@@ -205,8 +211,9 @@ with tab_expense:
             placeholder="Thuê hội trường A, catering 100 người...",
         )
         submitted_exp = st.form_submit_button(
-            "🔴 Ghi chi phí  [sp_add_finance_record]",
-            type="primary", use_container_width=True,
+            "Ghi chi phí [sp_add_finance_record]",
+            icon=":material/remove_circle:",
+            use_container_width=True,
         )
 
     if submitted_exp:
@@ -230,7 +237,7 @@ with tab_expense:
 # TAB 4: CHI TIẾT SỰ KIỆN
 # ════════════════════════════════════════════════════════════
 with tab_detail:
-    section("🔍", "Chi tiết tài chính một sự kiện")
+    section("info", "Chi tiết tài chính một sự kiện")
 
     ev_map_d = _load_event_select()
     if ev_map_d:
@@ -259,22 +266,22 @@ with tab_detail:
 
         c_inc, c_exp = st.columns(2)
         with c_inc:
-            st.markdown("**💚 Thu nhập**")
+            st.markdown("**:material/add_circle: Thu nhập**")
             if txns_income:
                 for t in txns_income:
                     st.markdown(
-                        f"✅ `{t['transaction_date']}` — "
+                        f"<span class='material-symbols-rounded' style='color:#10b981;font-size:1.1rem;vertical-align:middle;'>check_circle</span> `{t['transaction_date']}` — "
                         f"**{float(t['amount']):,.0f} VND** — {t.get('description','')}"
                     )
             else:
                 st.info("Chưa có thu nhập.")
 
         with c_exp:
-            st.markdown("**🔴 Chi phí**")
+            st.markdown("**:material/remove_circle: Chi phí**")
             if txns_expense:
                 for t in txns_expense:
                     st.markdown(
-                        f"❌ `{t['transaction_date']}` — "
+                        f"<span class='material-symbols-rounded' style='color:#ef4444;font-size:1.1rem;vertical-align:middle;'>cancel</span> `{t['transaction_date']}` — "
                         f"**{float(t['amount']):,.0f} VND** — {t.get('description','')}"
                     )
             else:
@@ -298,7 +305,7 @@ with tab_detail:
                 key="del_fin",
             )
             # ✅ st.button NGOÀI form → không lỗi
-            if col_del.button("🗑️ Xóa", key="del_fin_btn", use_container_width=True):
+            if col_del.button("Xóa", icon=":material/delete:", key="del_fin_btn", use_container_width=True):
                 db.finances.delete(del_fin_id)
                 show_success(f"Đã xóa giao dịch #{del_fin_id}!")
                 st.rerun()
@@ -309,21 +316,21 @@ with tab_detail:
 # ════════════════════════════════════════════════════════════
 with tab_period:
     import pandas as _pd
-    section("📅", "Báo cáo tài chính theo khoảng thời gian")
+    section("calendar_month", "Báo cáo tài chính theo khoảng thời gian")
 
     c1, c2 = st.columns(2)
     from_d = c1.date_input("Từ ngày", value=_pd.Timestamp.today() - _pd.Timedelta(days=90))
     to_d   = c2.date_input("Đến ngày", value=_pd.Timestamp.today() + _pd.Timedelta(days=90))
 
     # ✅ st.button NGOÀI form → hợp lệ
-    if st.button("🔍 Xem báo cáo", type="primary", key="fin_period_btn"):
+    if st.button("Xem báo cáo", icon=":material/search:", key="fin_period_btn"):
         with st.spinner():
             rows = db.finances.get_period_report(str(from_d), str(to_d))
         if rows:
             df_p = pd.DataFrame(rows)
-            st.dataframe(df_p, use_container_width=True, hide_index=True)
+            styled_df(rows, height=350)
             csv_p = df_p.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Tải CSV", csv_p,
-                               "finance_period_report.csv", "text/csv")
+            st.download_button("Tải CSV", csv_p,
+                               "finance_period_report.csv", "text/csv", icon=":material/download:")
         else:
             st.info("Không có giao dịch trong khoảng thời gian này.")

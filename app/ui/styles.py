@@ -5,35 +5,62 @@ Custom CSS và theme cho toàn bộ Streamlit UI
 
 CUSTOM_CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0');
+
+.material-symbols-rounded {
+    font-family: 'Material Symbols Rounded', sans-serif;
+    font-weight: normal;
+    font-style: normal;
+    font-size: inherit;
+    display: inline-block;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
+    word-wrap: normal;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+}
 /* ── GLOBAL ─────────────────────────────────── */
 [data-testid="stAppViewContainer"] {
-    background: #f8f9fb;
+    background: #F8FAFC !important;
+}
+/* Ép toàn bộ chữ (văn bản, tiêu đề, nhãn, tab) thành màu đen */
+[data-testid="stAppViewContainer"] p, 
+[data-testid="stAppViewContainer"] span, 
+[data-testid="stAppViewContainer"] h1, 
+[data-testid="stAppViewContainer"] h2, 
+[data-testid="stAppViewContainer"] h3, 
+[data-testid="stAppViewContainer"] h4, 
+[data-testid="stAppViewContainer"] label, 
+[data-testid="stAppViewContainer"] li {
+    color: #000000 !important;
 }
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1a1f3a 0%, #14192e 100%);
-    border-right: 1px solid rgba(255,255,255,0.06);
+    background: #F8FAFC !important;
+    border-right: 1px solid #e5e7f0;
 }
 [data-testid="stSidebar"] * {
-    color: #e2e8f0 !important;
+    color: #000000 !important;
 }
 
 /* ── SIDEBAR LOGO ───────────────────────────── */
 .sidebar-logo {
     text-align: center;
     padding: 1.2rem 0 0.6rem;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid #e5e7f0;
     margin-bottom: 0.8rem;
 }
 .sidebar-logo h2 {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #ffffff !important;
+    color: #000000 !important;
     margin: 0.4rem 0 0;
     letter-spacing: 0.5px;
 }
 .sidebar-logo p {
     font-size: 0.72rem;
-    color: #94a3b8 !important;
+    color: #000000 !important;
     margin: 0;
 }
 .sidebar-badge {
@@ -70,18 +97,18 @@ CUSTOM_CSS = """
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
-    color: #6b7280;
+    color: #000000;
     margin-bottom: 0.25rem;
 }
 .metric-value {
     font-size: 1.8rem;
     font-weight: 700;
     line-height: 1;
-    color: #111827;
+    color: #000000;
 }
 .metric-sub {
     font-size: 0.75rem;
-    color: #9ca3af;
+    color: #000000;
     margin-top: 0.3rem;
 }
 .metric-card.blue   { border-top: 3px solid #3b82f6; }
@@ -103,7 +130,7 @@ CUSTOM_CSS = """
 .section-header h3 {
     font-size: 1rem;
     font-weight: 600;
-    color: #374151;
+    color: #000000;
     margin: 0;
 }
 
@@ -123,13 +150,48 @@ CUSTOM_CSS = """
     font-size: 0.82rem;
     font-weight: 500;
     cursor: pointer;
-    border: none;
+    border: 1px solid #e5e7f0;
     transition: all .15s;
 }
-.qab-primary { background: #4f46e5; color: #fff; }
-.qab-primary:hover { background: #4338ca; }
-.qab-success { background: #059669; color: #fff; }
-.qab-amber   { background: #d97706; color: #fff; }
+.qab-primary, .qab-success, .qab-amber { background: #F8FAFC !important; color: #000000 !important; }
+.qab-primary:hover, .qab-success:hover, .qab-amber:hover { border-color: #000000 !important; }
+
+/* ── STREAMLIT DEFAULT BUTTONS & LINKS ──────── */
+[data-testid="stPageLink-NavLink"] p,
+[data-testid="stPageLink-NavLink"] span {
+    color: #000000 !important;
+}
+
+[data-testid="baseButton-secondary"],
+[data-testid="baseButton-primary"],
+button[kind="secondary"],
+button[kind="primary"],
+.stButton > button,
+.stDownloadButton > button,
+.stFormSubmitButton > button {
+    background-color: #F8FAFC !important;
+    border: 1px solid #e5e7f0 !important;
+}
+
+[data-testid="baseButton-secondary"] *,
+[data-testid="baseButton-primary"] *,
+button[kind="secondary"] *,
+button[kind="primary"] *,
+.stButton > button *,
+.stDownloadButton > button *,
+.stFormSubmitButton > button * {
+    color: #000000 !important;
+}
+
+[data-testid="baseButton-secondary"]:hover,
+[data-testid="baseButton-primary"]:hover,
+button[kind="secondary"]:hover,
+button[kind="primary"]:hover,
+.stButton > button:hover,
+.stDownloadButton > button:hover,
+.stFormSubmitButton > button:hover {
+    border-color: #000000 !important;
+}
 
 /* ── STATUS BADGES ──────────────────────────── */
 .badge {
@@ -161,17 +223,68 @@ CUSTOM_CSS = """
 }
 
 /* ── DATAFRAME ──────────────────────────────── */
-[data-testid="stDataFrame"] {
+[data-testid="stDataFrame"],
+[data-testid="stDataEditor"],
+[data-testid="stTable"],
+.stDataFrame {
     border-radius: 10px;
     overflow: hidden;
     border: 1px solid #e5e7f0;
+    background-color: #F8FAFC !important;
+}
+[data-testid="stDataFrame"] div,
+[data-testid="stDataFrame"] canvas,
+[data-testid="stDataEditor"] div,
+[data-testid="stDataEditor"] canvas,
+[data-testid="stTable"] table,
+[data-testid="stTable"] th,
+[data-testid="stTable"] td,
+table th,
+table td {
+    background-color: #F8FAFC !important;
+    color: #000000 !important;
+}
+[data-testid="stDataFrame"] *,
+[data-testid="stDataEditor"] *,
+[data-testid="stTable"] *,
+.stDataFrame *,
+table * {
+    color: #000000 !important;
 }
 
 /* ── FORM INPUTS ────────────────────────────── */
 [data-testid="stTextInput"] input,
 [data-testid="stNumberInput"] input,
-[data-testid="stSelectbox"] div {
+[data-baseweb="select"] > div {
     border-radius: 8px !important;
+    background-color: #FFFFFF !important;
+}
+[data-testid="stTextInput"] input,
+[data-testid="stNumberInput"] input,
+[data-baseweb="select"] * {
+    color: #000000 !important;
+}
+
+/* Danh sách lựa chọn thả xuống (Dropdown menu) */
+div[data-baseweb="popover"] {
+    background-color: #FFFFFF !important;
+}
+div[data-baseweb="popover"] * {
+    color: #000000 !important;
+}
+[role="listbox"] {
+    background-color: #FFFFFF !important;
+}
+[role="option"] {
+    background-color: #FFFFFF !important;
+}
+[role="option"]:hover,
+[role="option"][aria-selected="true"] {
+    background-color: #f1f5f9 !important;
+}
+span[data-baseweb="tag"] {
+    background-color: #e2e8f0 !important;
+    color: #000000 !important;
 }
 
 /* ── FOOTER ─────────────────────────────────── */
@@ -181,7 +294,7 @@ CUSTOM_CSS = """
     border-top: 1px solid #e5e7f0;
     margin-top: 2rem;
     font-size: 0.75rem;
-    color: #9ca3af;
+    color: #000000;
 }
 .app-footer a { color: #6366f1; text-decoration: none; }
 .app-footer a:hover { text-decoration: underline; }
@@ -190,12 +303,12 @@ CUSTOM_CSS = """
 .page-title {
     font-size: 1.5rem;
     font-weight: 700;
-    color: #111827;
+    color: #000000;
     margin-bottom: 0.25rem;
 }
 .page-subtitle {
     font-size: 0.85rem;
-    color: #6b7280;
+    color: #000000;
     margin-bottom: 1rem;
 }
 
@@ -209,7 +322,7 @@ CUSTOM_CSS = """
 def metric_card(icon: str, label: str, value: str, sub: str = "", color: str = "blue") -> str:
     return f"""
     <div class="metric-card {color}">
-        <span class="metric-icon">{icon}</span>
+        <span class="metric-icon material-symbols-rounded">{icon}</span>
         <div class="metric-label">{label}</div>
         <div class="metric-value">{value}</div>
         {f'<div class="metric-sub">{sub}</div>' if sub else ''}
@@ -219,7 +332,7 @@ def metric_card(icon: str, label: str, value: str, sub: str = "", color: str = "
 def section_header(icon: str, title: str) -> str:
     return f"""
     <div class="section-header">
-        <span style="font-size:1.1rem">{icon}</span>
+        <span class="material-symbols-rounded" style="font-size:1.4rem; color: #4f46e5;">{icon}</span>
         <h3>{title}</h3>
     </div>
     """
@@ -241,7 +354,7 @@ def status_badge(status: str) -> str:
 
 SIDEBAR_HTML = """
 <div class="sidebar-logo">
-    <div style="font-size:2.2rem">📅</div>
+    <div class="material-symbols-rounded" style="font-size:2.8rem; color: #4f46e5; margin-bottom: 0.2rem;">event_available</div>
     <h2>Event Management</h2>
     <p>NEU · DATCOM Lab</p>
     <span class="sidebar-badge">Project 14 · v2.0</span>

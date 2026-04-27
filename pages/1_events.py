@@ -12,8 +12,10 @@ from app.database.schemas import EventCreate
 from app.ui.components import (
     badge, section, stat_row, styled_df, show_success, show_error,
 )
+from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Sự kiện | EMS", page_icon="📋", layout="wide")
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ── Load db ──────────────────────────────────────────────────
 @st.cache_resource
@@ -24,7 +26,7 @@ db = get_db()
 
 # ── Sidebar filter ───────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 🔽 Bộ lọc")
+    st.markdown("### :material/filter_list: Bộ lọc")
     status_f = st.selectbox(
         "Trạng thái",
         ["Tất cả", "Draft", "Scheduled", "Full", "Completed", "Cancelled"],
@@ -36,8 +38,8 @@ with st.sidebar:
 
 # ── Page header ──────────────────────────────────────────────
 c_title, c_btn = st.columns([4, 1])
-c_title.markdown("## 📋 Quản lý Sự kiện")
-add_new = c_btn.button("➕ Tạo sự kiện mới", type="primary", use_container_width=True)
+c_title.markdown("## :material/event: Quản lý Sự kiện")
+add_new = c_btn.button("Tạo sự kiện mới", icon=":material/add:", use_container_width=True)
 
 # ── Load data ────────────────────────────────────────────────
 sf = None if status_f == "Tất cả" else status_f
@@ -66,7 +68,7 @@ if events:
 
 # ── TABS ─────────────────────────────────────────────────────
 tab_list, tab_detail, tab_edit, tab_delete = st.tabs([
-    "📄 Danh sách", "🔍 Chi tiết", "✏️ Tạo / Sửa", "🗑️ Xóa"
+    ":material/list: Danh sách", ":material/info: Chi tiết", ":material/edit: Tạo / Sửa", ":material/delete: Xóa"
 ])
 
 
@@ -88,14 +90,14 @@ with tab_list:
 
         # Download CSV
         csv = pd.DataFrame(events).to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Tải CSV", csv, "events.csv", "text/csv")
+        st.download_button("Tải CSV", csv, "events.csv", "text/csv", icon=":material/download:")
 
 
 # ════════════════════════════════════════════════════════════
 # TAB 2: CHI TIẾT
 # ════════════════════════════════════════════════════════════
 with tab_detail:
-    section("🔍", "Chi tiết sự kiện", "Xem thông tin đầy đủ + KPIs")
+    section("info", "Chi tiết sự kiện", "Xem thông tin đầy đủ + KPIs")
 
     ev_ids = [e["event_id"] for e in events] if events else []
     ev_names = {e["event_id"]: f"#{e['event_id']} — {e['event_name']}" for e in (events or [])}
@@ -157,7 +159,7 @@ with tab_detail:
 # TAB 3: TẠO / SỬA
 # ════════════════════════════════════════════════════════════
 with tab_edit:
-    mode = st.radio("Chế độ", ["➕ Tạo mới", "✏️ Sửa sự kiện"], horizontal=True, key="ev_mode")
+    mode = st.radio("Chế độ", ["Tạo mới", "Sửa sự kiện"], horizontal=True, key="ev_mode")
 
     # Load venues + organizers for selects
     venues_q = db.events.execute_query("SELECT venue_id, venue_name, capacity FROM Venues ORDER BY venue_name") or []
@@ -167,7 +169,7 @@ with tab_edit:
 
     # Prefill if editing
     prefill: dict = {}
-    if mode.startswith("✏️") and ev_ids:
+    if mode.startswith("Sửa") and ev_ids:
         edit_id = st.selectbox(
             "Sự kiện cần sửa",
             ev_ids, format_func=lambda x: ev_names.get(x, str(x)),
@@ -176,8 +178,8 @@ with tab_edit:
         raw = db.events.get_by_id(edit_id) or {}
         prefill = raw
 
-    with st.form("form_event", clear_on_submit=(mode.startswith("➕"))):
-        section("📝", "Thông tin sự kiện")
+    with st.form("form_event", clear_on_submit=(mode.startswith("Tạo"))):
+        section("edit_note", "Thông tin sự kiện")
         name = st.text_input(
             "Tên sự kiện *",
             value=prefill.get("event_name", ""),
@@ -237,8 +239,9 @@ with tab_edit:
         )
         desc = st.text_area("Mô tả", value=prefill.get("description") or "")
 
-        btn_label = "✅ Tạo sự kiện" if mode.startswith("➕") else "💾 Lưu thay đổi"
-        submitted = st.form_submit_button(btn_label, type="primary", use_container_width=True)
+        btn_label = "Tạo sự kiện" if mode.startswith("Tạo") else "Lưu thay đổi"
+        btn_icon = ":material/add:" if mode.startswith("Tạo") else ":material/save:"
+        submitted = st.form_submit_button(btn_label, icon=btn_icon, use_container_width=True)
 
     if submitted:
         if not name or not v_options or not o_options:
@@ -255,7 +258,7 @@ with tab_edit:
                     max_capacity=int(max_cap) if max_cap > 0 else None,
                     description=desc or None,
                 )
-                if mode.startswith("➕"):
+                if mode.startswith("Tạo"):
                     new_id = db.events.create(data)
                     show_success(f"Đã tạo sự kiện '{name}' (ID: {new_id})!")
                 else:
@@ -270,7 +273,7 @@ with tab_edit:
 # TAB 4: XÓA
 # ════════════════════════════════════════════════════════════
 with tab_delete:
-    section("🗑️", "Xóa sự kiện", "Xóa sẽ cascade xóa toàn bộ đăng ký và tài chính liên quan")
+    section("delete", "Xóa sự kiện", "Xóa sẽ cascade xóa toàn bộ đăng ký và tài chính liên quan")
 
     if not ev_ids:
         st.info("Không có sự kiện nào.")
@@ -288,7 +291,7 @@ with tab_delete:
             )
             col1, col2 = st.columns([1, 3])
             confirm = col1.checkbox("Tôi xác nhận muốn xóa", key="confirm_del_ev")
-            if col2.button("🗑️ Xóa vĩnh viễn", type="primary", disabled=not confirm):
+            if col2.button("Xóa vĩnh viễn", icon=":material/delete_forever:", disabled=not confirm):
                 with st.spinner("Đang xóa..."):
                     db.events.delete(del_id)
                 show_success(f"Đã xóa sự kiện #{del_id}!")
@@ -296,5 +299,5 @@ with tab_delete:
 
 # ── Floating "Tạo mới" shortcut ──────────────────────────────
 if add_new:
-    st.session_state["ev_mode"] = "➕ Tạo mới"
+    st.session_state["ev_mode"] = "Tạo mới"
     st.rerun()
