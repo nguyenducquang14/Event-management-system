@@ -10,6 +10,7 @@ from app.models import Event, Venue, Organizer
 from app.cli.utils import (
     console, print_table, success, error, info, warning, pause, prompt_int
 )
+from app.cli.auth_utils import requires_permission
 
 
 # ── Helper: chuyển row proxy → dict ─────────────────────────
@@ -179,7 +180,11 @@ def update_event():
 
 
 # ── Xóa sự kiện ─────────────────────────────────────────────
-def delete_event():
+@requires_permission("delete_event")
+def delete_event(current_user=None):
+    if current_user:
+        info(f"Tài khoản [bold cyan]{current_user.get('username')}[/bold cyan] đang thực hiện quyền [bold yellow]delete_event[/bold yellow].")
+        
     event_id = prompt_int("Nhập Event ID cần xóa")
     with get_db() as db:
         row = db.execute(

@@ -17,6 +17,41 @@ from app.ui.styles import CUSTOM_CSS
 st.set_page_config(page_title="Báo cáo | EMS", page_icon="📊", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# 1. BỨC TƯỜNG LỬA
+if "token" not in st.session_state or "user_info" not in st.session_state:
+    st.warning("Vui lòng đăng nhập để truy cập!")
+    st.stop()
+
+user_info = st.session_state["user_info"]
+roles = user_info.get("roles", [])
+is_admin = "Admin" in roles
+is_organizer = "Organizer" in roles
+
+if not is_admin and not is_organizer:
+    st.error("Lỗi 403: Cấm truy cập. Khu vực này dành riêng cho Ban tổ chức và Admin.")
+    st.stop()
+
+# --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] ul li:nth-child(8),
+    [data-testid="stSidebarNav"] ul li:nth-child(9),
+    [data-testid="stSidebarNav"] ul li:nth-child(10),
+    [data-testid="stSidebarNav"] ul li:nth-child(11),
+    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(1),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(2),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(3),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(4),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+owner_id = None
+if is_organizer and not is_admin:
+    from app.database.repositories.organizer_repo import OrganizerRepository
+    org_repo = OrganizerRepository()
+    owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
 
 @st.cache_resource
 def get_db():
@@ -34,7 +69,30 @@ st.markdown("## :material/analytics: Báo cáo & Thống kê")
 
 # ── Load dashboard stats ─────────────────────────────────────
 with st.spinner("Đang tải số liệu..."):
-    stats = db.get_dashboard_stats()
+    if owner_id:
+        my_summary = db.events.execute_query(f"SELECT * FROM view_event_summary WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})") or []
+        counts = db.events.execute_query(f"""
+            SELECT 
+                COUNT(DISTINCT r.guest_id) as total_guests,
+                COUNT(r.registration_id) as total_registrations,
+                SUM(r.attendance_status = 'Attended') as total_attended
+            FROM Registrations r
+            JOIN Events e ON r.event_id = e.event_id
+            WHERE e.organizer_id = {owner_id}
+        """)
+        class DummyStats:
+            total_events = len(my_summary)
+            total_guests = counts[0].get("total_guests") if counts and counts[0] else 0
+            total_registrations = int(counts[0].get("total_registrations") or 0) if counts and counts[0] else 0
+            total_attended = int(counts[0].get("total_attended") or 0) if counts and counts[0] else 0
+            total_income = sum(float(s["total_income"] or 0) for s in my_summary)
+            total_expense = sum(float(s["total_expense"] or 0) for s in my_summary)
+            net_balance = total_income - total_expense
+        stats = DummyStats()
+        summary = my_summary
+    else:
+        stats = db.get_dashboard_stats()
+        summary = db.events.get_summary()
 
 stat_row([
     ("Tổng sự kiện",    stats.total_events,        "blue"),
@@ -61,16 +119,13 @@ st.markdown("")
 with tab_event:
     section("bar_chart", "Thống kê tổng hợp sự kiện")
 
-    with st.spinner():
-        summary = db.events.get_summary()
-
     if not summary:
         st.info("Chưa có dữ liệu.")
     else:
         df_s = pd.DataFrame(summary)
         avg_rate = float(df_s["attendance_rate_pct"].mean() or 0)
 
-        c_gauge, c_bar = st.columns([1, 2])
+        c_gauge, c_empty = st.columns([1, 2])
 
         # Gauge chart
         with c_gauge:
@@ -86,7 +141,7 @@ with tab_event:
                         {"range": [40, 70], "color": "#fef3c7"},
                         {"range": [70,100], "color": "#d1fae5"},
                     ],
-                    "threshold": {"line": {"color": "#1f2937", "width": 3},
+                    "threshold": {"line": {"color": "#ef4444", "width": 3},
                                   "thickness": 0.75, "value": avg_rate},
                 },
                 number={"suffix": "%", "font": {"size": 36, "color": "#000000"}},
@@ -100,39 +155,39 @@ with tab_event:
             st.plotly_chart(fig_gauge, use_container_width=True)
 
         # Stacked bar: Attended + No-show
-        with c_bar:
-            fig_bar = go.Figure()
-            names = df_s["event_name"].str[:20]
-            fig_bar.add_bar(
-                name="Attended", x=names,
-                y=df_s["total_attended"].astype(float),
-                marker_color="#6366f1",
-            )
-            fig_bar.add_bar(
-                name="No-show",  x=names,
-                y=df_s["total_noshow"].astype(float),
-                marker_color="#f87171",
-            )
-            fig_bar.add_bar(
-                name="Registered", x=names,
-                y=df_s["total_registered"].fillna(0).astype(float)
-                   - df_s["total_attended"].astype(float)
-                   - df_s["total_noshow"].astype(float),
-                marker_color="#c7d2fe",
-            )
-            fig_bar.update_traces(textfont_color="#000000")
-            fig_bar.update_layout(
-                barmode="stack", height=240,
-                legend=dict(orientation="v", font=dict(color="#000000")),
-                margin=dict(l=0, r=0, t=10, b=30),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
-                yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
-                font=dict(color="#000000"),
-                hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
+        st.markdown("#### Biểu đồ Thống kê Đăng ký & Tham dự")
+        fig_bar = go.Figure()
+        names = df_s["event_name"].str[:25]
+        fig_bar.add_bar(
+            name="Attended", x=names,
+            y=df_s["total_attended"].astype(float),
+            marker_color="#6366f1",
+        )
+        fig_bar.add_bar(
+            name="No-show",  x=names,
+            y=df_s["total_noshow"].astype(float),
+            marker_color="#f87171",
+        )
+        fig_bar.add_bar(
+            name="Registered", x=names,
+            y=df_s["total_registered"].fillna(0).astype(float)
+               - df_s["total_attended"].astype(float)
+               - df_s["total_noshow"].astype(float),
+            marker_color="#c7d2fe",
+        )
+        fig_bar.update_traces(textfont_color="#000000")
+        fig_bar.update_layout(
+            barmode="stack", height=350,
+            legend=dict(orientation="h", y=-0.2, font=dict(color="#000000")),
+            margin=dict(l=0, r=0, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
         st.divider()
         styled_df(summary, height=300)
@@ -151,7 +206,22 @@ with tab_guest:
                                   key="rpt_sort")
 
     with st.spinner():
-        activity = db.guests.get_activity(limit=top_n)
+        if owner_id:
+            activity = db.events.execute_query(f"""
+                SELECT g.guest_name, g.email,
+                       COUNT(r.event_id) AS total_registrations,
+                       SUM(r.attendance_status='Attended') AS total_attended,
+                       ROUND(SUM(r.attendance_status='Attended') / NULLIF(COUNT(r.event_id),0) * 100, 2) AS personal_rate_pct
+                FROM Guests g 
+                JOIN Registrations r ON g.guest_id=r.guest_id
+                JOIN Events e ON r.event_id = e.event_id
+                WHERE e.organizer_id = {owner_id}
+                GROUP BY g.guest_id, g.guest_name, g.email
+                ORDER BY {sort_by} DESC
+                LIMIT {top_n}
+            """) or []
+        else:
+            activity = db.guests.get_activity(limit=top_n)
 
     if activity:
         df_a = pd.DataFrame(activity)
@@ -173,7 +243,7 @@ with tab_guest:
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             xaxis=dict(color="#000000", tickfont=dict(color="#000000")),
-            yaxis=dict(autorange="reversed", color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(autorange="reversed"),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
             coloraxis_colorbar=dict(
@@ -196,7 +266,18 @@ with tab_venue:
     section("apartment", "Thống kê sử dụng địa điểm")
 
     with st.spinner():
-        venues = db.events.execute_query("SELECT * FROM view_venue_usage") or []
+        if owner_id:
+            venues = db.events.execute_query(f"""
+                SELECT v.venue_id, v.venue_name, v.capacity, v.availability_status,
+                       COUNT(e.event_id) AS total_events,
+                       SUM(e.status = 'Completed') AS completed_events
+                FROM Venues v
+                JOIN Events e ON v.venue_id = e.venue_id
+                WHERE e.organizer_id = {owner_id}
+                GROUP BY v.venue_id, v.venue_name, v.capacity, v.availability_status
+            """) or []
+        else:
+            venues = db.events.execute_query("SELECT * FROM view_venue_usage") or []
 
     if venues:
         df_v = pd.DataFrame(venues)
@@ -212,10 +293,10 @@ with tab_venue:
         )
         fig_bar_v.update_traces(textfont_color="#000000")
         fig_bar_v.update_layout(
-            margin=dict(l=0, r=0, t=40, b=20),
+            margin=dict(l=0, r=0, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
             yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
@@ -236,8 +317,20 @@ with tab_finance:
     section("payments", "Báo cáo tài chính tổng hợp")
 
     with st.spinner():
-        fin_report = db.finances.get_all_report()
-        fin_balance = db.finances.get_balance_all()
+        if owner_id:
+            fin_balance = db.events.execute_query(f"""
+                SELECT e.event_id, e.event_name, 
+                       COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) as total_income,
+                       COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as total_expense,
+                       COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) - COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as net_balance
+                FROM Events e
+                LEFT JOIN Finances f ON e.event_id = f.event_id
+                WHERE e.organizer_id = {owner_id}
+                GROUP BY e.event_id, e.event_name
+                HAVING total_income > 0 OR total_expense > 0
+            """) or []
+        else:
+            fin_balance = db.finances.get_balance_all()
 
     if fin_balance:
         df_bal = pd.DataFrame(fin_balance)
@@ -254,11 +347,11 @@ with tab_finance:
         fig_bal_bar.update_traces(textfont_color="#000000")
         fig_bal_bar.update_layout(
             title=dict(text="Số dư ròng theo sự kiện", font=dict(color="#000000")),
-            height=320,
-            margin=dict(l=0, r=0, t=40, b=60),
+            height=380,
+            margin=dict(l=0, r=0, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
             yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
@@ -283,8 +376,19 @@ with tab_period:
     run    = col3.button("Xem", icon=":material/search:", use_container_width=True, key="rpt_period_btn")
 
     if run:
-        with st.spinner("Đang gọi sp_event_report..."):
-            rows = db.get_event_report(str(from_d), str(to_d))
+        with st.spinner("Đang truy xuất dữ liệu..."):
+            if owner_id:
+                rows = db.events.execute_query(f"""
+                    SELECT event_name, start_time, status, venue_name,
+                           total_registered, total_attended, attendance_rate_pct,
+                           total_income, total_expense, net_balance
+                    FROM view_event_summary
+                    WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})
+                    AND DATE(start_time) BETWEEN '{from_d}' AND '{to_d}'
+                    ORDER BY start_time
+                """) or []
+            else:
+                rows = db.get_event_report(str(from_d), str(to_d))
         if rows:
             df_r = pd.DataFrame(rows)
             st.caption(f"Tìm thấy {len(rows)} sự kiện từ {from_d} đến {to_d}")
@@ -299,8 +403,8 @@ with tab_period:
                 )
                 fig_mini.update_traces(textfont_color="#000000")
                 fig_mini.update_layout(
-                    margin=dict(l=0,r=0,t=10,b=60), 
-                    xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+                    margin=dict(l=0,r=0,t=10,b=10), 
+                    xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
                     yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
                     paper_bgcolor="rgba(0,0,0,0)", 
                     plot_bgcolor="rgba(0,0,0,0)", 
@@ -323,20 +427,30 @@ with tab_excel:
     section("download", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
     from sqlalchemy import text as sqlt
 
-    SHEET_QUERIES = {
-        "📋 Tổng hợp sự kiện":   "SELECT * FROM view_event_summary",
-        "💰 Báo cáo tài chính":  "SELECT * FROM view_finance_report",
-        "👥 Danh sách khách":    "SELECT guest_id,guest_name,email,phone_number,address,created_at FROM Guests ORDER BY guest_name",
-        "🏢 Địa điểm":           "SELECT * FROM view_venue_usage",
-        "✅ Đăng ký (an toàn)":  "SELECT * FROM v_safe_registrations",
-        "🏆 Top khách":          """
-            SELECT g.guest_name, g.email,
-                   COUNT(r.event_id) AS total_reg,
-                   SUM(r.attendance_status='Attended') AS total_attended
-            FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id
-            GROUP BY g.guest_id ORDER BY total_reg DESC
-        """,
-    }
+    if owner_id:
+        SHEET_QUERIES = {
+            "📋 Tổng hợp sự kiện":   f"SELECT * FROM view_event_summary WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})",
+            "💰 Báo cáo tài chính":  f"SELECT * FROM view_finance_report WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})",
+            "👥 Danh sách khách":    f"SELECT DISTINCT g.guest_id, g.guest_name, g.email, g.phone_number, g.address, g.created_at FROM Guests g JOIN Registrations r ON g.guest_id = r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id}",
+            "🏢 Địa điểm":           f"SELECT v.venue_name, COUNT(e.event_id) as total_events FROM Venues v JOIN Events e ON v.venue_id = e.venue_id WHERE e.organizer_id = {owner_id} GROUP BY v.venue_name",
+            "✅ Đăng ký (an toàn)":  f"SELECT * FROM v_safe_registrations WHERE event_name IN (SELECT event_name FROM Events WHERE organizer_id = {owner_id})",
+            "🏆 Top khách":          f"SELECT g.guest_name, g.email, COUNT(r.event_id) AS total_reg, SUM(r.attendance_status='Attended') AS total_attended FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id} GROUP BY g.guest_id ORDER BY total_reg DESC",
+        }
+    else:
+        SHEET_QUERIES = {
+            "📋 Tổng hợp sự kiện":   "SELECT * FROM view_event_summary",
+            "💰 Báo cáo tài chính":  "SELECT * FROM view_finance_report",
+            "👥 Danh sách khách":    "SELECT guest_id,guest_name,email,phone_number,address,created_at FROM Guests ORDER BY guest_name",
+            "🏢 Địa điểm":           "SELECT * FROM view_venue_usage",
+            "✅ Đăng ký (an toàn)":  "SELECT * FROM v_safe_registrations",
+            "🏆 Top khách":          """
+                SELECT g.guest_name, g.email,
+                       COUNT(r.event_id) AS total_reg,
+                       SUM(r.attendance_status='Attended') AS total_attended
+                FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id
+                GROUP BY g.guest_id ORDER BY total_reg DESC
+            """,
+        }
 
     selected_sheets = st.multiselect(
         "Chọn sheet muốn xuất:",
@@ -399,6 +513,6 @@ with tab_excel:
         # Preview
         st.divider()
         st.markdown("**Preview — Tổng hợp sự kiện:**")
-        preview = db.events.get_summary()
+        preview = summary
         if preview:
             styled_df(preview[:5], height=200)

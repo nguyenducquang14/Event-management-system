@@ -22,10 +22,12 @@ CUSTOM_CSS = """
     -webkit-font-smoothing: antialiased;
 }
 /* ── GLOBAL ─────────────────────────────────── */
-[data-testid="stAppViewContainer"] {
+[data-testid="stAppViewContainer"],
+div[data-testid="stDialog"] > div,
+div[role="dialog"] {
     background: #F8FAFC !important;
 }
-/* Ép toàn bộ chữ (văn bản, tiêu đề, nhãn, tab) thành màu đen */
+/* Ép toàn bộ chữ (văn bản, tiêu đề, nhãn, tab) thành màu đen cho App và Pop-up */
 [data-testid="stAppViewContainer"] p, 
 [data-testid="stAppViewContainer"] span, 
 [data-testid="stAppViewContainer"] h1, 
@@ -33,7 +35,15 @@ CUSTOM_CSS = """
 [data-testid="stAppViewContainer"] h3, 
 [data-testid="stAppViewContainer"] h4, 
 [data-testid="stAppViewContainer"] label, 
-[data-testid="stAppViewContainer"] li {
+[data-testid="stAppViewContainer"] li,
+div[data-testid="stDialog"] p,
+div[data-testid="stDialog"] span,
+div[data-testid="stDialog"] h1,
+div[data-testid="stDialog"] h2,
+div[data-testid="stDialog"] h3,
+div[data-testid="stDialog"] h4,
+div[data-testid="stDialog"] label,
+div[data-testid="stDialog"] li {
     color: #000000 !important;
 }
 [data-testid="stSidebar"] {

@@ -16,6 +16,42 @@ from app.ui.styles import CUSTOM_CSS
 st.set_page_config(page_title="Đăng ký & Check-in | EMS", page_icon="✅", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# 1. BỨC TƯỜNG LỬA (Phân quyền bảo mật)
+if "token" not in st.session_state or "user_info" not in st.session_state:
+    st.warning("Vui lòng đăng nhập để truy cập!")
+    st.stop()
+
+user_info = st.session_state["user_info"]
+roles = user_info.get("roles", [])
+is_admin = "Admin" in roles
+is_organizer = "Organizer" in roles
+
+if not is_admin and not is_organizer:
+    st.error("Lỗi 403: Cấm truy cập.")
+    st.stop()
+
+# --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] ul li:nth-child(8),
+    [data-testid="stSidebarNav"] ul li:nth-child(9),
+    [data-testid="stSidebarNav"] ul li:nth-child(10),
+    [data-testid="stSidebarNav"] ul li:nth-child(11),
+    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(1),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(2),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(3),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(4),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+owner_id = None
+if is_organizer and not is_admin:
+    from app.database.repositories.organizer_repo import OrganizerRepository
+    org_repo = OrganizerRepository()
+    owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
+
 
 @st.cache_resource
 def get_db():
@@ -28,7 +64,11 @@ st.markdown("## :material/how_to_reg: Đăng ký & Check-in")
 
 # ── Chọn sự kiện (dùng toàn trang) ─────────────────────────
 with st.spinner("Đang tải sự kiện..."):
-    events = db.events.get_all() or []
+    # Truy vấn trực tiếp từ DB để đảm bảo lấy được các sự kiện vừa mới tạo (không bị dính cache)
+    if owner_id:
+        events = db.events.execute_query(f"SELECT event_id, event_name, status FROM Events WHERE organizer_id = {owner_id} ORDER BY event_id DESC") or []
+    else:
+        events = db.events.execute_query("SELECT event_id, event_name, status FROM Events ORDER BY event_id DESC") or []
 
 ev_map = {e["event_id"]: f"#{e['event_id']} {e['event_name']} [{e.get('status','')}]"
           for e in events}

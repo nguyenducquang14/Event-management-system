@@ -6,6 +6,8 @@ Trang Quản lý Sự kiện — CRUD đầy đủ + data_editor + filter + dial
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
+from sqlalchemy import text
+from app.config import get_db as get_db_session
 
 from app.database import DatabaseManager
 from app.database.schemas import EventCreate
@@ -16,6 +18,42 @@ from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Sự kiện | EMS", page_icon="📋", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# 1. BỨC TƯỜNG LỬA (Phân quyền bảo mật)
+if "token" not in st.session_state or "user_info" not in st.session_state:
+    st.warning("Vui lòng đăng nhập để truy cập!")
+    st.stop()
+
+user_info = st.session_state["user_info"]
+roles = user_info.get("roles", [])
+is_admin = "Admin" in roles
+is_organizer = "Organizer" in roles
+
+if not is_admin and not is_organizer:
+    st.error("Lỗi 403: Cấm truy cập.")
+    st.stop()
+
+# --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] ul li:nth-child(8),
+    [data-testid="stSidebarNav"] ul li:nth-child(9),
+    [data-testid="stSidebarNav"] ul li:nth-child(10),
+    [data-testid="stSidebarNav"] ul li:nth-child(11),
+    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(1),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(2),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(3),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(4),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+owner_id = None
+if is_organizer and not is_admin:
+    from app.database.repositories.organizer_repo import OrganizerRepository
+    org_repo = OrganizerRepository()
+    owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
 
 # ── Load db ──────────────────────────────────────────────────
 @st.cache_resource
@@ -45,6 +83,9 @@ add_new = c_btn.button("Tạo sự kiện mới", icon=":material/add:", use_con
 sf = None if status_f == "Tất cả" else status_f
 with st.spinner("Đang tải dữ liệu..."):
     events = db.events.get_all(status_filter=sf)
+    
+if owner_id and events:
+    events = [e for e in events if e.get("organizer_id") == owner_id]
 
 # Filter by keyword
 if keyword and events:
@@ -113,7 +154,34 @@ with tab_detail:
         )
 
         with st.spinner():
-            ev = db.events.get_by_id(selected_id)
+            raw_ev = db.events.execute_query(f"""
+                SELECT e.*, 
+                       v.venue_name, v.capacity AS venue_capacity, v.address AS venue_address,
+                       o.organizer_name,
+                       (SELECT COUNT(*) FROM Registrations r WHERE r.event_id = e.event_id) as current_registered,
+                       (SELECT COUNT(*) FROM Registrations r WHERE r.event_id = e.event_id AND r.attendance_status = 'Attended') as total_attended,
+                       (SELECT COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) - COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) FROM Finances f WHERE f.event_id = e.event_id) AS net_balance
+                FROM Events e
+                LEFT JOIN Venues v ON e.venue_id = v.venue_id
+                LEFT JOIN Organizers o ON e.organizer_id = o.organizer_id
+                WHERE e.event_id = {selected_id}
+            """)
+            
+            if raw_ev:
+                ev = raw_ev[0]
+                reg = ev.get("current_registered") or 0
+                attended = ev.get("total_attended") or 0
+                ev["attendance_rate_pct"] = (attended / reg * 100) if reg > 0 else 0
+                if ev.get("max_capacity"):
+                    ev["slots_remaining"] = ev["max_capacity"] - reg
+                else:
+                    ev["slots_remaining"] = None
+            else:
+                ev = db.events.get_by_id(selected_id)
+                if ev:
+                    ev["attendance_rate_pct"] = 0
+                    ev["net_balance"] = 0
+                    ev["slots_remaining"] = ev.get("max_capacity")
 
         if ev:
             # KPI row
@@ -139,6 +207,33 @@ with tab_detail:
             c2.markdown(f"**Sức chứa venue:** {ev.get('venue_capacity','—')}")
             c2.markdown(f"**Ban tổ chức:** {ev.get('organizer_name','—')}")
             c2.markdown(f"**Mô tả:** {ev.get('description') or '—'}")
+            
+            if ev.get("image_url"):
+                st.image(ev["image_url"], use_container_width=True)
+
+            # --- MÃ QR CHECK-IN / CHECK-OUT ---
+            st.divider()
+            st.markdown("### :material/qr_code_scanner: Mã QR Điểm danh Sự kiện")
+            st.info("Ban tổ chức có thể in mã QR này và đặt tại bàn tiếp đón. Khách mời hoặc nhân viên có thể sử dụng ứng dụng quét để điểm danh nhanh chóng.")
+            
+            c_qr1, c_qr2 = st.columns(2)
+            # Tạo URL chứa QR thông qua API miễn phí
+            ci_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=CHECKIN_EVENT_{selected_id}"
+            co_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=CHECKOUT_EVENT_{selected_id}"
+            
+            with c_qr1:
+                with st.container(border=True):
+                    st.markdown("<h4 style='text-align: center; color: #10b981;'>📥 MÃ CHECK-IN</h4>", unsafe_allow_html=True)
+                    _, c_img1, _ = st.columns([1, 2, 1])
+                    c_img1.image(ci_url, use_container_width=True)
+                    st.caption(f"<div style='text-align: center'>Dữ liệu: CHECKIN_EVENT_{selected_id}</div>", unsafe_allow_html=True)
+                    
+            with c_qr2:
+                with st.container(border=True):
+                    st.markdown("<h4 style='text-align: center; color: #ef4444;'>📤 MÃ CHECK-OUT</h4>", unsafe_allow_html=True)
+                    _, c_img2, _ = st.columns([1, 2, 1])
+                    c_img2.image(co_url, use_container_width=True)
+                    st.caption(f"<div style='text-align: center'>Dữ liệu: CHECKOUT_EVENT_{selected_id}</div>", unsafe_allow_html=True)
 
             # Registrations sub-table
             st.divider()
@@ -153,6 +248,13 @@ with tab_detail:
                 styled_df(disp_r, badge_cols=["Trạng thái"], height=220)
             else:
                 st.info("Chưa có đăng ký nào.")
+                
+            # Nút điều hướng nhanh sang trang Khách mời / Đăng ký
+            st.markdown("---")
+            if st.button("👉 Quản lý Khách mời, Đăng ký & Check-in cho Sự kiện này", type="primary", use_container_width=True):
+                # Lưu event_id vào session để sang trang kia tự động chọn
+                st.session_state["reg_event_sel"] = selected_id
+                st.switch_page("pages/4_Đăng_ký_và_Check_in.py")
 
 
 # ════════════════════════════════════════════════════════════
@@ -164,6 +266,8 @@ with tab_edit:
     # Load venues + organizers for selects
     venues_q = db.events.execute_query("SELECT venue_id, venue_name, capacity FROM Venues ORDER BY venue_name") or []
     orgs_q   = db.events.execute_query("SELECT organizer_id, organizer_name FROM Organizers ORDER BY organizer_name") or []
+    if owner_id:
+        orgs_q = [o for o in orgs_q if o["organizer_id"] == owner_id]
     v_map = {r["venue_name"]: r["venue_id"] for r in venues_q}
     o_map = {r["organizer_name"]: r["organizer_id"] for r in orgs_q}
 
@@ -237,6 +341,7 @@ with tab_edit:
             min_value=0, step=10,
             value=int(prefill.get("max_capacity") or 0),
         )
+        img_url = st.text_input("Link ảnh minh họa (URL)", value=prefill.get("image_url") or "", placeholder="Ví dụ: https://images.unsplash.com/...")
         desc = st.text_area("Mô tả", value=prefill.get("description") or "")
 
         btn_label = "Tạo sự kiện" if mode.startswith("Tạo") else "Lưu thay đổi"
@@ -260,9 +365,14 @@ with tab_edit:
                 )
                 if mode.startswith("Tạo"):
                     new_id = db.events.create(data)
+                    if img_url:
+                        with get_db_session() as sess:
+                            sess.execute(text("UPDATE Events SET image_url = :img WHERE event_id = :id"), {"img": img_url, "id": new_id})
                     show_success(f"Đã tạo sự kiện '{name}' (ID: {new_id})!")
                 else:
                     db.events.update(edit_id, data)
+                    with get_db_session() as sess:
+                        sess.execute(text("UPDATE Events SET image_url = :img WHERE event_id = :id"), {"img": img_url if img_url else None, "id": edit_id})
                     show_success(f"Đã cập nhật sự kiện #{edit_id}!")
                 st.rerun()
             except Exception as e:

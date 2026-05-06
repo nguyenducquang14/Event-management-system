@@ -17,6 +17,42 @@ from app.ui.styles import CUSTOM_CSS
 st.set_page_config(page_title="Khách mời | EMS", page_icon="👥", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# 1. BỨC TƯỜNG LỬA (Phân quyền bảo mật)
+if "token" not in st.session_state or "user_info" not in st.session_state:
+    st.warning("Vui lòng đăng nhập để truy cập!")
+    st.stop()
+
+user_info = st.session_state["user_info"]
+roles = user_info.get("roles", [])
+is_admin = "Admin" in roles
+is_organizer = "Organizer" in roles
+
+if not is_admin and not is_organizer:
+    st.error("Lỗi 403: Cấm truy cập.")
+    st.stop()
+
+# --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] ul li:nth-child(8),
+    [data-testid="stSidebarNav"] ul li:nth-child(9),
+    [data-testid="stSidebarNav"] ul li:nth-child(10),
+    [data-testid="stSidebarNav"] ul li:nth-child(11),
+    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(1),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(2),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(3),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(4),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+owner_id = None
+if is_organizer and not is_admin:
+    from app.database.repositories.organizer_repo import OrganizerRepository
+    org_repo = OrganizerRepository()
+    owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
+
 
 @st.cache_resource
 def get_db():
@@ -39,16 +75,23 @@ kw = st.text_input(
 
 # ── Load data ────────────────────────────────────────────────
 with st.spinner("Đang tải..."):
-    if kw:
-        guests = db.guests.search(kw)
-        total_label = f"Tìm thấy: {len(guests)} khách"
+    if owner_id:
+        query = f"SELECT DISTINCT g.* FROM Guests g JOIN Registrations r ON g.guest_id = r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id}"
+        if kw:
+            query += f" AND (g.guest_name LIKE '%{kw}%' OR g.email LIKE '%{kw}%')"
+        guests = db.events.execute_query(query) or []
+        total_label = f"Khách của tôi: {len(guests)} khách"
     else:
-        result = db.guests.get_all(page=1, page_size=200)
-        guests = result.get("data", [])
-        total_label = f"Tổng: {result.get('total', 0)} khách"
+        if kw:
+            guests = db.guests.search(kw)
+            total_label = f"Tìm thấy: {len(guests)} khách"
+        else:
+            result = db.guests.get_all(page=1, page_size=200)
+            guests = result.get("data", [])
+            total_label = f"Tổng: {result.get('total', 0)} khách"
 
 # ── Stats ────────────────────────────────────────────────────
-total = db.guests.count()
+total = len(guests) if owner_id else db.guests.count()
 stat_row([
     ("Tổng khách mời", total, "blue"),
     ("Kết quả hiện tại", len(guests), "purple"),
@@ -100,7 +143,22 @@ with tab_activity:
     top_n = st.slider("Hiển thị top", 5, 30, 10, key="guest_top_n")
 
     with st.spinner():
-        activity = db.guests.get_activity(limit=top_n)
+        if owner_id:
+            activity = db.events.execute_query(f"""
+                SELECT g.guest_name, g.email,
+                       COUNT(r.event_id) AS total_registrations,
+                       SUM(r.attendance_status='Attended') AS total_attended,
+                       ROUND(SUM(r.attendance_status='Attended') / NULLIF(COUNT(r.event_id),0) * 100, 2) AS personal_rate_pct
+                FROM Guests g 
+                JOIN Registrations r ON g.guest_id=r.guest_id
+                JOIN Events e ON r.event_id = e.event_id
+                WHERE e.organizer_id = {owner_id}
+                GROUP BY g.guest_id, g.guest_name, g.email
+                ORDER BY total_registrations DESC
+                LIMIT {top_n}
+            """) or []
+        else:
+            activity = db.guests.get_activity(limit=top_n)
 
     if activity:
         df_a = pd.DataFrame(activity)
@@ -119,7 +177,7 @@ with tab_activity:
             margin=dict(l=0, r=0, t=10, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
             yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),

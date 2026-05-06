@@ -18,6 +18,42 @@ from app.ui.styles import CUSTOM_CSS
 st.set_page_config(page_title="Tài chính | EMS", page_icon="💰", layout="wide")
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+# 1. BỨC TƯỜNG LỬA (Phân quyền bảo mật)
+if "token" not in st.session_state or "user_info" not in st.session_state:
+    st.warning("Vui lòng đăng nhập để truy cập!")
+    st.stop()
+
+user_info = st.session_state["user_info"]
+roles = user_info.get("roles", [])
+is_admin = "Admin" in roles
+is_organizer = "Organizer" in roles
+
+if not is_admin and not is_organizer:
+    st.error("Lỗi 403: Cấm truy cập. Khu vực này dành riêng cho Ban tổ chức và Admin.")
+    st.stop()
+
+# --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
+st.markdown("""
+<style>
+    [data-testid="stSidebarNav"] ul li:nth-child(8),
+    [data-testid="stSidebarNav"] ul li:nth-child(9),
+    [data-testid="stSidebarNav"] ul li:nth-child(10),
+    [data-testid="stSidebarNav"] ul li:nth-child(11),
+    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(1),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(2),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(3),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(4),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+owner_id = None
+if is_organizer and not is_admin:
+    from app.database.repositories.organizer_repo import OrganizerRepository
+    org_repo = OrganizerRepository()
+    owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
+
 
 @st.cache_resource
 def get_db():
@@ -30,10 +66,28 @@ st.markdown("## 💰 Quản lý Tài chính")
 
 # ── Global KPIs ──────────────────────────────────────────────
 with st.spinner("Đang tải số liệu..."):
-    total_income  = db.finances.get_total_income_all()
-    total_expense = db.finances.get_total_expense_all()
-    net_all       = total_income - total_expense
-    balances      = db.finances.get_balance_all()
+    if owner_id:
+        my_balances = db.events.execute_query(f"""
+            SELECT e.event_id, e.event_name, 
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) as total_income,
+                   COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as total_expense,
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) - COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as net_balance,
+                   COUNT(f.finance_id) as total_transactions
+            FROM Events e
+            LEFT JOIN Finances f ON e.event_id = f.event_id
+            WHERE e.organizer_id = {owner_id}
+            GROUP BY e.event_id, e.event_name
+            HAVING total_transactions > 0
+        """) or []
+        balances = my_balances
+        total_income = sum(float(b["total_income"]) for b in balances)
+        total_expense = sum(float(b["total_expense"]) for b in balances)
+        net_all = total_income - total_expense
+    else:
+        total_income  = db.finances.get_total_income_all()
+        total_expense = db.finances.get_total_expense_all()
+        net_all       = total_income - total_expense
+        balances      = db.finances.get_balance_all()
 
 stat_row([
     ("Tổng thu toàn hệ thống",  f"{total_income/1e6:.1f}M VND",  "green"),
@@ -61,46 +115,44 @@ with tab_overview:
         st.info("Chưa có giao dịch tài chính nào.")
     else:
         df_b = pd.DataFrame(balances)
-        c_chart, c_table = st.columns([3, 2])
+        
+        section("bar_chart", "Thu − Chi − Số dư theo sự kiện")
+        names = df_b["event_name"].str[:25]
+        fig = go.Figure()
+        fig.add_bar(name="Thu (Income)", x=names,
+                    y=df_b["total_income"].astype(float), marker_color="#34d399")
+        fig.add_bar(name="Chi (Expense)", x=names,
+                    y=df_b["total_expense"].astype(float), marker_color="#fb923c")
+        fig.add_scatter(name="Số dư", x=names,
+                        y=df_b["net_balance"].astype(float),
+                        mode="lines+markers",
+                        line=dict(color="#6366f1", width=2.5),
+                        yaxis="y2")
+        fig.update_traces(textfont_color="#000000")
+        fig.update_layout(
+            barmode="group", height=400,
+            yaxis2=dict(overlaying="y", side="right", color="#000000", tickfont=dict(color="#000000")),
+            legend=dict(orientation="h", y=-0.2, font=dict(color="#000000")),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=0, t=10, b=10),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            font=dict(color="#000000"),
+            hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-        with c_chart:
-            section("bar_chart", "Thu − Chi − Số dư theo sự kiện")
-            names = df_b["event_name"].str[:18]
-            fig = go.Figure()
-            fig.add_bar(name="Thu (Income)", x=names,
-                        y=df_b["total_income"].astype(float), marker_color="#34d399")
-            fig.add_bar(name="Chi (Expense)", x=names,
-                        y=df_b["total_expense"].astype(float), marker_color="#fb923c")
-            fig.add_scatter(name="Số dư", x=names,
-                            y=df_b["net_balance"].astype(float),
-                            mode="lines+markers",
-                            line=dict(color="#6366f1", width=2.5),
-                            yaxis="y2")
-            fig.update_traces(textfont_color="#000000")
-            fig.update_layout(
-                barmode="group", height=340,
-                yaxis2=dict(overlaying="y", side="right", color="#000000", tickfont=dict(color="#000000")),
-                legend=dict(orientation="v", x=1.15, font=dict(color="#000000")),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0, r=0, t=10, b=30),
-                xaxis=dict(tickangle=-30, color="#000000", tickfont=dict(color="#000000")),
-                yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
-                font=dict(color="#000000"),
-                hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with c_table:
-            section("table_view", "Bảng số dư từng sự kiện")
-            disp = [{
-                "Sự kiện":   str(b["event_name"])[:30],
-                "Thu (M)":   f"{float(b['total_income'])/1e6:.1f}",
-                "Chi (M)":   f"{float(b['total_expense'])/1e6:.1f}",
-                "Số dư (M)": f"{float(b['net_balance'])/1e6:+.1f}",
-                "GD":        b.get("total_transactions", 0),
-            } for b in balances]
-            styled_df(disp, height=320)
+        st.divider()
+        section("table_view", "Bảng số dư từng sự kiện")
+        disp = [{
+            "Sự kiện":   str(b["event_name"])[:30],
+            "Thu (M)":   f"{float(b['total_income'])/1e6:.1f}",
+            "Chi (M)":   f"{float(b['total_expense'])/1e6:.1f}",
+            "Số dư (M)": f"{float(b['net_balance'])/1e6:+.1f}",
+            "GD":        b.get("total_transactions", 0),
+        } for b in balances]
+        styled_df(disp, height=320)
 
 
 # ════════════════════════════════════════════════════════════
@@ -108,6 +160,8 @@ with tab_overview:
 # ════════════════════════════════════════════════════════════
 def _load_event_select():
     events = db.events.get_all() or []
+    if owner_id:
+        events = [e for e in events if e.get("organizer_id") == owner_id]
     return {e["event_id"]: f"#{e['event_id']} {e['event_name']}" for e in events}
 
 
@@ -325,7 +379,16 @@ with tab_period:
     # ✅ st.button NGOÀI form → hợp lệ
     if st.button("Xem báo cáo", icon=":material/search:", key="fin_period_btn"):
         with st.spinner():
-            rows = db.finances.get_period_report(str(from_d), str(to_d))
+            if owner_id:
+                rows = db.events.execute_query(f"""
+                    SELECT event_name, type, amount, description, transaction_date 
+                    FROM view_finance_report 
+                    WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})
+                    AND transaction_date BETWEEN '{from_d}' AND '{to_d}'
+                    ORDER BY transaction_date DESC
+                """) or []
+            else:
+                rows = db.finances.get_period_report(str(from_d), str(to_d))
         if rows:
             df_p = pd.DataFrame(rows)
             styled_df(rows, height=350)

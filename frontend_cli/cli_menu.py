@@ -10,6 +10,9 @@ from app.cli.registration_menu import registration_menu
 from app.cli.finance_menu      import finance_menu
 from app.cli.report_menu       import report_menu
 from app.cli.utils             import console
+from app.cli.auth_cli          import render_login_screen
+from app.cli.auth_utils        import clear_current_token
+from app.config                import get_db
 
 
 def main_menu():
@@ -18,6 +21,8 @@ def main_menu():
         choice = questionary.select(
             "Chọn chức năng:",
             choices=[
+                "L.  Đăng nhập hệ thống",
+                "O.  Đăng xuất",
                 "1.  Quản lý Sự kiện",
                 "2.  Quản lý Khách mời",
                 "3.  Đăng ký & Check-in",
@@ -32,6 +37,10 @@ def main_menu():
         if not choice or choice.startswith("0"):
             console.print("\n[dim]  Tạm biệt! Hẹn gặp lại.[/dim]\n")
             break
+        elif choice.startswith("L"):
+            with get_db() as db:
+                render_login_screen(db)
+        elif choice.startswith("O"): clear_current_token()
         elif choice.startswith("1"): event_menu()
         elif choice.startswith("2"): guest_menu()
         elif choice.startswith("3"): registration_menu()
