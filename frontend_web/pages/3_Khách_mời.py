@@ -177,8 +177,8 @@ with tab_activity:
             margin=dict(l=0, r=0, t=10, b=30),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
-            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
             coloraxis_colorbar=dict(

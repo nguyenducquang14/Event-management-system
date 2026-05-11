@@ -170,6 +170,25 @@ def show_registration_dialog(eid, event_name, guest_id, cap, reg_count, price_va
         st.markdown("#### 4. Phương thức thanh toán")
         pay_method = st.radio("Chọn phương thức", ["💳 Chuyển khoản ngân hàng", "📱 Ví điện tử (Momo, VNPay, ZaloPay)", "🌍 Thẻ tín dụng/Ghi nợ"])
         
+        if pay_method == "💳 Chuyển khoản ngân hàng":
+            with get_db() as db:
+                try:
+                    org_bank = db.execute(text("""
+                        SELECT o.bank_name, o.bank_account_number, o.bank_account_name 
+                        FROM Events e JOIN Organizers o ON e.organizer_id = o.organizer_id 
+                        WHERE e.event_id = :eid
+                    """), {"eid": eid}).fetchone()
+                    if org_bank and org_bank.bank_name and org_bank.bank_account_number:
+                        st.info(f"**Vui lòng chuyển khoản vào tài khoản:**\n\n"
+                                f"🏦 **Ngân hàng:** {org_bank.bank_name}\n\n"
+                                f"💳 **Số tài khoản:** `{org_bank.bank_account_number}`\n\n"
+                                f"👤 **Chủ tài khoản:** {org_bank.bank_account_name}\n\n"
+                                f"📝 **Nội dung:** `TT ve {event_name[:20]} - {phone}`", icon=":material/account_balance:")
+                    else:
+                        st.warning("Ban tổ chức chưa cung cấp thông tin tài khoản ngân hàng. Vui lòng liên hệ trực tiếp với Ban tổ chức để thanh toán.", icon=":material/warning:")
+                except Exception:
+                    pass
+
         st.markdown("---")
         c_total, c_btn = st.columns([1, 1], vertical_alignment="bottom")
         c_total.markdown(f"Tổng thanh toán ({ticket_count} vé {ticket_type.split(' ')[0]}): <h3 style='color: #ef4444 !important; margin-top: 0;'>{total_price:,.0f} VNĐ</h3>", unsafe_allow_html=True)

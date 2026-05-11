@@ -8,6 +8,8 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from sqlalchemy import text
+from app.config import get_db as get_db_session
 
 from app.database import DatabaseManager
 from app.ui.components import (
@@ -98,13 +100,22 @@ stat_row([
 st.markdown("")
 
 # ── Tabs ─────────────────────────────────────────────────────
-tab_overview, tab_income, tab_expense, tab_detail, tab_period = st.tabs([
+tab_overview, tab_income, tab_expense, tab_detail, tab_period, tab_bank = st.tabs([
     ":material/analytics: Tổng hợp",
     ":material/add_circle: Ghi thu nhập",
     ":material/remove_circle: Ghi chi phí",
     ":material/info: Chi tiết sự kiện",
     ":material/calendar_month: Báo cáo kỳ",
+    ":material/account_balance: Tài khoản NH",
 ])
+
+# Đảm bảo bảng Organizers có các cột thông tin ngân hàng
+with get_db_session() as sess:
+    try:
+        sess.execute(text("ALTER TABLE Organizers ADD COLUMN bank_name VARCHAR(100), ADD COLUMN bank_account_number VARCHAR(50), ADD COLUMN bank_account_name VARCHAR(150)"))
+        sess.commit()
+    except Exception:
+        pass
 
 
 # ════════════════════════════════════════════════════════════
@@ -131,13 +142,13 @@ with tab_overview:
         fig.update_traces(textfont_color="#000000")
         fig.update_layout(
             barmode="group", height=400,
-            yaxis2=dict(overlaying="y", side="right", color="#000000", tickfont=dict(color="#000000")),
+            yaxis2=dict(overlaying="y", side="right", color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
             legend=dict(orientation="h", y=-0.2, font=dict(color="#000000")),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=0, r=0, t=10, b=10),
-            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000")),
-            yaxis=dict(color="#000000", tickfont=dict(color="#000000")),
+            xaxis=dict(tickangle=0, color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
+            yaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
             font=dict(color="#000000"),
             hoverlabel=dict(font_color="#000000", bgcolor="#FFFFFF"),
         )
@@ -397,3 +408,39 @@ with tab_period:
                                "finance_period_report.csv", "text/csv", icon=":material/download:")
         else:
             st.info("Không có giao dịch trong khoảng thời gian này.")
+
+
+# ════════════════════════════════════════════════════════════
+# TAB 6: TÀI KHOẢN NGÂN HÀNG
+# ════════════════════════════════════════════════════════════
+with tab_bank:
+    section("account_balance", "Cấu hình Tài khoản Ngân hàng", "Thông tin này sẽ hiển thị cho khách hàng khi họ chọn phương thức thanh toán chuyển khoản.")
+    
+    if owner_id:
+        with get_db_session() as sess:
+            org_info = sess.execute(text("SELECT bank_name, bank_account_number, bank_account_name FROM Organizers WHERE organizer_id = :oid"), {"oid": owner_id}).fetchone()
+            
+        with st.form("form_bank_account", border=True):
+            b_name = st.text_input("Tên Ngân hàng *", value=org_info.bank_name if org_info and org_info.bank_name else "", placeholder="VD: Vietcombank, Techcombank, MBBank...")
+            b_num = st.text_input("Số Tài khoản *", value=org_info.bank_account_number if org_info and org_info.bank_account_number else "", placeholder="VD: 0123456789")
+            b_acc_name = st.text_input("Tên Chủ tài khoản *", value=org_info.bank_account_name if org_info and org_info.bank_account_name else "", placeholder="VD: CONG TY TNHH ABC hoặc NGUYEN VAN A")
+            
+            if st.form_submit_button("Lưu cấu hình", type="primary", icon=":material/save:", use_container_width=True):
+                if not b_name or not b_num or not b_acc_name:
+                    show_error("Vui lòng điền đầy đủ thông tin tài khoản ngân hàng!")
+                else:
+                    with get_db_session() as sess:
+                        sess.execute(text("""
+                            UPDATE Organizers 
+                            SET bank_name = :bname, bank_account_number = :bnum, bank_account_name = :baccname 
+                            WHERE organizer_id = :oid
+                        """), {
+                            "bname": b_name, "bnum": b_num, "baccname": b_acc_name, "oid": owner_id
+                        })
+                        sess.commit()
+                    show_success("Đã cập nhật thông tin tài khoản ngân hàng thành công!")
+                    import time
+                    time.sleep(1.5)
+                    st.rerun()
+    else:
+        st.info("Tính năng cấu hình tài khoản ngân hàng chỉ dành cho Ban tổ chức (Organizer).")

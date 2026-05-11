@@ -11,6 +11,30 @@ import time
 
 st.set_page_config(page_title="EMS | Trang chủ", page_icon="📅", layout="wide")
 
+GOLDEN_UI_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    html, body, [class*="st-"], .stMarkdownContainer, p, h1, h2, h3, h4, h5, h6, span, div, button, input, label, li { font-family: 'Inter', sans-serif !important; }
+    .block-container { padding: 2.5rem 3rem 4rem 3rem !important; max-width: 1200px !important; }
+    .stApp { background-color: #F8FAFC !important; }
+    h1, h2, h3, h4, h5, h6 { color: #0F172A !important; font-weight: 700 !important; }
+    p, span, label, li, .stMarkdownContainer { color: #334155 !important; }
+    button[kind="primary"] { background-color: #1E3A8A !important; color: #FFFFFF !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 1.5rem !important; font-weight: 600 !important; transition: all 0.2s ease-in-out !important; }
+    button[kind="primary"]:hover { background-color: #1E40AF !important; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important; }
+    button[kind="primary"] p, button[kind="primary"] div { color: #FFFFFF !important; }
+    button[kind="secondary"] { background-color: #FFFFFF !important; color: #0F172A !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 0.5rem 1.5rem !important; font-weight: 500 !important; transition: all 0.2s ease-in-out !important; }
+    button[kind="secondary"]:hover { background-color: #F1F5F9 !important; border-color: #94A3B8 !important; transform: translateY(-2px); }
+    button[kind="secondary"] p, button[kind="secondary"] div { color: #0F172A !important; }
+    div[data-testid="stForm"], div[data-testid="stVerticalBlockBorderWrapper"] > div, div[data-testid="metric-container"], .stAlert { background-color: #FFFFFF !important; border-radius: 12px !important; border: 1px solid #E2E8F0 !important; padding: 1.25rem !important; transition: box-shadow 0.3s ease-in-out, transform 0.3s ease !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+    div[data-testid="stForm"]:hover, div[data-testid="stVerticalBlockBorderWrapper"] > div:hover, div[data-testid="metric-container"]:hover { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important; transform: translateY(-2px) !important; }
+    input, textarea, div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border-radius: 8px !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; padding: 0.25rem 0.5rem !important; }
+    input:focus, textarea:focus, div[data-baseweb="select"] > div:focus-within { border-color: #1E3A8A !important; box-shadow: 0 0 0 1px #1E3A8A !important; }
+    [data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important; }
+    div[data-testid="metric-container"] label { color: #64748B !important; font-weight: 500 !important; }
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] { color: #1E3A8A !important; font-weight: 700 !important; font-size: 2rem !important; }
+</style>
+"""
+
 # --- KHỞI TẠO CƠ SỞ DỮ LIỆU BẢO MẬT (AUTH) ---
 # Tự động tạo các bảng users, roles nếu chưa có và chèn dữ liệu quyền hạn mặc định
 @st.cache_resource
@@ -247,7 +271,7 @@ def render_dashboard():
         st.switch_page("pages/7_Sự_Kiện_Công_Khai.py")
         return
         
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+    st.markdown(CUSTOM_CSS + GOLDEN_UI_CSS, unsafe_allow_html=True)
     
     # --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
     st.markdown("""
@@ -286,7 +310,7 @@ if "token" in st.session_state:
     render_dashboard()
 else:
     # Chỉ chèn CSS làm ẩn sidebar và đổi màu khi chưa đăng nhập
-    st.markdown(GUEST_CSS, unsafe_allow_html=True)
+    st.markdown(GUEST_CSS + GOLDEN_UI_CSS, unsafe_allow_html=True)
     
     if st.session_state["current_page"] == "landing":
         render_landing_page()
