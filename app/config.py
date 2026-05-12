@@ -2,7 +2,7 @@ import os
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Tải các biến môi trường từ tệp .env (nếu có)
 load_dotenv()
@@ -35,6 +35,8 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600, conn
 
 # Khởi tạo Session Factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
 
 @contextmanager
 def get_db():
