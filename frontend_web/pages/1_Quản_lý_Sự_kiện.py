@@ -138,7 +138,7 @@ with tab_list:
 # TAB 2: CHI TIẾT
 # ════════════════════════════════════════════════════════════
 with tab_detail:
-    section("info", "Chi tiết sự kiện", "Xem thông tin đầy đủ + KPIs")
+    section(":material/info:", "Chi tiết sự kiện", "Xem thông tin đầy đủ + KPIs")
 
     ev_ids = [e["event_id"] for e in events] if events else []
     ev_names = {e["event_id"]: f"#{e['event_id']} — {e['event_name']}" for e in (events or [])}
@@ -262,7 +262,7 @@ with tab_detail:
 # ════════════════════════════════════════════════════════════
 with tab_edit:
     mode = st.radio("Chế độ", ["Tạo mới", "Sửa sự kiện"], horizontal=True, key="ev_mode")
-
+    
     # Load venues + organizers for selects
     venues_q = db.events.execute_query("SELECT venue_id, venue_name, capacity FROM Venues ORDER BY venue_name") or []
     orgs_q   = db.events.execute_query("SELECT organizer_id, organizer_name FROM Organizers ORDER BY organizer_name") or []
@@ -283,7 +283,7 @@ with tab_edit:
         prefill = raw
 
     with st.form("form_event", clear_on_submit=(mode.startswith("Tạo"))):
-        section("edit_note", "Thông tin sự kiện")
+        section(":material/edit_note:", "Thông tin sự kiện")
         name = st.text_input(
             "Tên sự kiện *",
             value=prefill.get("event_name", ""),
@@ -383,7 +383,7 @@ with tab_edit:
 # TAB 4: XÓA
 # ════════════════════════════════════════════════════════════
 with tab_delete:
-    section("delete", "Xóa sự kiện", "Xóa sẽ cascade xóa toàn bộ đăng ký và tài chính liên quan")
+    section(":material/delete:", "Xóa sự kiện", "Xóa sẽ cascade xóa toàn bộ đăng ký và tài chính liên quan")
 
     if not ev_ids:
         st.info("Không có sự kiện nào.")

@@ -153,7 +153,7 @@ st.markdown("")
 # TAB 1: SỰ KIỆN
 # ════════════════════════════════════════════════════════════
 with tab_event:
-    section("bar_chart", "Thống kê tổng hợp sự kiện")
+    section(":material/bar_chart:", "Thống kê tổng hợp sự kiện")
 
     if not summary:
         st.info("Chưa có dữ liệu.")
@@ -233,7 +233,7 @@ with tab_event:
 # TAB 2: TIẾN ĐỘ BÁN VÉ & ĐĂNG KÝ
 # ════════════════════════════════════════════════════════════
 with tab_ticket:
-    section("confirmation_number", "Tiến độ Bán vé & Đăng ký", "Theo dõi tốc độ tiêu thụ vé, tỷ lệ lấp đầy và chuyển đổi.")
+    section(":material/confirmation_number:", "Tiến độ Bán vé & Đăng ký", "Theo dõi tốc độ tiêu thụ vé, tỷ lệ lấp đầy và chuyển đổi.")
 
     with st.spinner("Đang phân tích dữ liệu bán vé..."):
         if owner_id:
@@ -351,7 +351,7 @@ with tab_ticket:
 # TAB 3: NHÂN KHẨU HỌC & HÀNH VI
 # ════════════════════════════════════════════════════════════
 with tab_demographic:
-    section("pie_chart", "Nhân khẩu học & Hành vi", "Phân tích chân dung khách hàng và nguồn dẫn (Traffic Sources).")
+    section(":material/pie_chart:", "Nhân khẩu học & Hành vi", "Phân tích chân dung khách hàng và nguồn dẫn (Traffic Sources).")
     
     with st.spinner("Đang phân tích dữ liệu khách hàng..."):
         # Đảm bảo các cột dữ liệu nhân khẩu và khảo sát tồn tại trong DB trước khi truy vấn
@@ -488,7 +488,7 @@ with tab_demographic:
 # TAB 4: TOP KHÁCH
 # ════════════════════════════════════════════════════════════
 with tab_guest:
-    section("emoji_events", "Top khách tích cực nhất")
+    section(":material/emoji_events:", "Top khách tích cực nhất")
 
     col_sl, col_sort = st.columns([2, 2])
     top_n    = col_sl.slider("Hiển thị top", 5, 50, 15, key="rpt_top_n")
@@ -554,7 +554,7 @@ with tab_guest:
 # TAB 3: ĐỊA ĐIỂM
 # ════════════════════════════════════════════════════════════
 with tab_venue:
-    section("apartment", "Thống kê sử dụng địa điểm")
+    section(":material/apartment:", "Thống kê sử dụng địa điểm")
 
     with st.spinner():
         if owner_id:
@@ -612,7 +612,7 @@ with tab_venue:
 # TAB 4: TÀI CHÍNH
 # ════════════════════════════════════════════════════════════
 with tab_finance:
-    section("payments", "Báo cáo tài chính tổng hợp")
+    section(":material/payments:", "Báo cáo tài chính tổng hợp")
 
     with st.spinner():
         if owner_id:
@@ -665,7 +665,7 @@ with tab_finance:
 # TAB 5: BÁO CÁO KỲ
 # ════════════════════════════════════════════════════════════
 with tab_period:
-    section("calendar_month", "Báo cáo sự kiện theo khoảng thời gian",
+    section(":material/calendar_month:", "Báo cáo sự kiện theo khoảng thời gian",
             "Gọi sp_event_report")
 
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -739,7 +739,7 @@ with tab_period:
 # TAB 6: XUẤT EXCEL
 # ════════════════════════════════════════════════════════════
 with tab_excel:
-    section("download", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
+    section(":material/download:", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
     from sqlalchemy import text as sqlt
 
     if owner_id:

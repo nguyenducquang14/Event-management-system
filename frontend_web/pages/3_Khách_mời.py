@@ -114,7 +114,7 @@ with tab_list:
     if not guests:
         st.info("Không tìm thấy khách nào.")
     else:
-        section("list", "Danh sách khách mời", "Chuyển sang tab 'Sửa thông tin' để cập nhật dữ liệu")
+        section(":material/list:", "Danh sách khách mời", "Chuyển sang tab 'Sửa thông tin' để cập nhật dữ liệu")
 
         df_guests = pd.DataFrame(guests)
         keep_cols = [c for c in
@@ -139,7 +139,7 @@ with tab_list:
 with tab_activity:
     import plotly.express as px
 
-    section("emoji_events", "Top khách tích cực", "Khách tham dự nhiều sự kiện nhất")
+    section(":material/emoji_events:", "Top khách tích cực", "Khách tham dự nhiều sự kiện nhất")
     top_n = st.slider("Hiển thị top", 5, 30, 10, key="guest_top_n")
 
     with st.spinner():
@@ -196,7 +196,7 @@ with tab_activity:
 
     # Chi tiết một khách
     st.divider()
-    section("history", "Lịch sử sự kiện của một khách")
+    section(":material/history:", "Lịch sử sự kiện của một khách")
     if guests:
         guest_map = {g["guest_id"]: f"#{g['guest_id']} {g['guest_name']}" for g in guests}
         sel_g = st.selectbox("Chọn khách", list(guest_map.keys()),
@@ -212,7 +212,7 @@ with tab_activity:
 # TAB 3: THÊM MỚI
 # ════════════════════════════════════════════════════════════
 with tab_add:
-    section("person_add", "Thêm khách mời mới")
+    section(":material/person_add:", "Thêm khách mời mới")
 
     with st.form("form_add_guest", clear_on_submit=True):
         name  = st.text_input("Họ tên *")
@@ -228,6 +228,7 @@ with tab_add:
         if not name or not email:
             show_error("Họ tên và Email là bắt buộc.")
         else:
+            success_add = False
             try:
                 new_id = db.guests.create(
                     GuestCreate(
@@ -238,8 +239,11 @@ with tab_add:
                 )
                 show_success(f"Đã thêm khách '{name}' (ID: {new_id})!")
                 st.rerun()
+                success_add = True
             except Exception as e:
                 show_error(f"Lỗi: {e}")
+            if success_add:
+                st.rerun()
 
     # Bulk add hint
     st.divider()
@@ -269,7 +273,7 @@ with tab_add:
 # TAB 4: SỬA THÔNG TIN
 # ════════════════════════════════════════════════════════════
 with tab_edit:
-    section("edit", "Sửa thông tin khách mời")
+    section(":material/edit:", "Sửa thông tin khách mời")
 
     if not guests:
         st.info("Không có khách nào.")
@@ -292,6 +296,7 @@ with tab_edit:
             saved = st.form_submit_button("Lưu thay đổi", icon=":material/save:", use_container_width=True)
 
         if saved:
+            success_edit = False
             try:
                 db.guests.update(
                     edit_gid,
@@ -302,15 +307,18 @@ with tab_edit:
                 )
                 show_success(f"Đã cập nhật khách #{edit_gid}!")
                 st.rerun()
+                success_edit = True
             except Exception as e:
                 show_error(f"Lỗi: {e}")
+            if success_edit:
+                st.rerun()
 
 
 # ════════════════════════════════════════════════════════════
 # TAB 5: XÓA
 # ════════════════════════════════════════════════════════════
 with tab_delete:
-    section("delete", "Xóa khách mời", "Xóa cascade toàn bộ lịch sử đăng ký của khách này")
+    section(":material/delete:", "Xóa khách mời", "Xóa cascade toàn bộ lịch sử đăng ký của khách này")
 
     if not guests:
         st.info("Không có khách nào.")

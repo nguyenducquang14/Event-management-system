@@ -128,7 +128,7 @@ with tab_list:
         filtered = regs if sf == "Tất cả" else [r for r in regs if r.get("attendance_status") == sf]
 
         # Render with per-row check-in button
-        section("list", f"Danh sách — {ev_detail.get('event_name','')}", f"{len(filtered)} khách")
+        section(":material/list:", f"Danh sách — {ev_detail.get('event_name','')}", f"{len(filtered)} khách")
 
         if filtered:
             for reg in filtered:
@@ -164,7 +164,7 @@ with tab_list:
 # ════════════════════════════════════════════════════════════
 with tab_register:
     section(
-        "person_add", "Đăng ký khách tham dự",
+        ":material/person_add:", "Đăng ký khách tham dự",
         "Gọi sp_register_guest — tự kiểm tra trùng lặp, capacity, trạng thái"
     )
 
@@ -226,7 +226,7 @@ with tab_register:
 # ════════════════════════════════════════════════════════════
 with tab_checkin:
     section(
-        "check_circle", "Check-in khách",
+        ":material/check_circle:", "Check-in khách",
         "Gọi sp_guest_checkin — cập nhật attendance_status + ghi checkin_time"
     )
 
@@ -269,7 +269,7 @@ with tab_checkin:
 # TAB 4: NO-SHOW HÀNG LOẠT
 # ════════════════════════════════════════════════════════════
 with tab_bulk:
-    section("block", "Đánh dấu No-show hàng loạt",
+    section(":material/block:", "Đánh dấu No-show hàng loạt",
             "Dùng sau khi sự kiện kết thúc — tất cả 'Registered' chưa check-in sẽ thành No-show")
 
     pending_count = stats_ev.get("registered", 0)
@@ -288,7 +288,7 @@ with tab_bulk:
             st.rerun()
 
     st.divider()
-    section("flag", "Kết thúc sự kiện", "Gọi sp_mark_event_completed — tự động No-show + cập nhật status")
+    section(":material/flag:", "Kết thúc sự kiện", "Gọi sp_mark_event_completed — tự động No-show + cập nhật status")
     confirm_done = st.checkbox("Xác nhận kết thúc sự kiện", key="confirm_done_ev")
     if st.button("Kết thúc sự kiện [sp_mark_event_completed]", icon=":material/flag:", disabled=not confirm_done):
         with st.spinner("Đang gọi sp_mark_event_completed..."):
@@ -304,7 +304,7 @@ with tab_bulk:
 # TAB 5: HỦY ĐĂNG KÝ
 # ════════════════════════════════════════════════════════════
 with tab_cancel:
-    section("delete", "Hủy đăng ký", "Xóa hoàn toàn bản ghi đăng ký")
+    section(":material/delete:", "Hủy đăng ký", "Xóa hoàn toàn bản ghi đăng ký")
 
     if not regs:
         st.info("Không có đăng ký nào để hủy.")

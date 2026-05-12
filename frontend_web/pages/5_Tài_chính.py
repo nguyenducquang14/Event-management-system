@@ -127,7 +127,7 @@ with tab_overview:
     else:
         df_b = pd.DataFrame(balances)
         
-        section("bar_chart", "Thu − Chi − Số dư theo sự kiện")
+        section(":material/bar_chart:", "Thu − Chi − Số dư theo sự kiện")
         names = df_b["event_name"].str[:25]
         fig = go.Figure()
         fig.add_bar(name="Thu (Income)", x=names,
@@ -155,7 +155,7 @@ with tab_overview:
         st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
-        section("table_view", "Bảng số dư từng sự kiện")
+        section(":material/table_view:", "Bảng số dư từng sự kiện")
         disp = [{
             "Sự kiện":   str(b["event_name"])[:30],
             "Thu (M)":   f"{float(b['total_income'])/1e6:.1f}",
@@ -180,7 +180,7 @@ def _load_event_select():
 # TAB 2: GHI THU NHẬP
 # ════════════════════════════════════════════════════════════
 with tab_income:
-    section("add_circle", "Ghi nhận thu nhập", "Gọi sp_add_finance_record với type='Income'")
+    section(":material/add_circle:", "Ghi nhận thu nhập", "Gọi sp_add_finance_record với type='Income'")
 
     ev_map_i = _load_event_select()
 
@@ -242,7 +242,7 @@ with tab_income:
 # TAB 3: GHI CHI PHÍ
 # ════════════════════════════════════════════════════════════
 with tab_expense:
-    section("remove_circle", "Ghi nhận chi phí", "Gọi sp_add_finance_record với type='Expense'")
+    section(":material/remove_circle:", "Ghi nhận chi phí", "Gọi sp_add_finance_record với type='Expense'")
 
     ev_map_e = _load_event_select()
 
@@ -302,7 +302,7 @@ with tab_expense:
 # TAB 4: CHI TIẾT SỰ KIỆN
 # ════════════════════════════════════════════════════════════
 with tab_detail:
-    section("info", "Chi tiết tài chính một sự kiện")
+    section(":material/info:", "Chi tiết tài chính một sự kiện")
 
     ev_map_d = _load_event_select()
     if ev_map_d:
@@ -381,7 +381,7 @@ with tab_detail:
 # ════════════════════════════════════════════════════════════
 with tab_period:
     import pandas as _pd
-    section("calendar_month", "Báo cáo tài chính theo khoảng thời gian")
+    section(":material/calendar_month:", "Báo cáo tài chính theo khoảng thời gian")
 
     c1, c2 = st.columns(2)
     from_d = c1.date_input("Từ ngày", value=_pd.Timestamp.today() - _pd.Timedelta(days=90))
@@ -414,7 +414,7 @@ with tab_period:
 # TAB 6: TÀI KHOẢN NGÂN HÀNG
 # ════════════════════════════════════════════════════════════
 with tab_bank:
-    section("account_balance", "Cấu hình Tài khoản Ngân hàng", "Thông tin này sẽ hiển thị cho khách hàng khi họ chọn phương thức thanh toán chuyển khoản.")
+    section(":material/account_balance:", "Cấu hình Tài khoản Ngân hàng", "Thông tin này sẽ hiển thị cho khách hàng khi họ chọn phương thức thanh toán chuyển khoản.")
     
     if owner_id:
         with get_db_session() as sess:
