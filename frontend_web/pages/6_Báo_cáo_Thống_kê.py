@@ -306,7 +306,7 @@ with tab_ticket:
             fig_cap.update_layout(
                 height=300, margin=dict(l=0, r=0, t=10, b=10),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                legend=dict(orientation="h", y=-0.3, font=dict(color="#000000")),
+                legend=dict(font=dict(color="#000000")),
                 xaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
                 yaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
                 font=dict(color="#000000")
@@ -434,8 +434,8 @@ with tab_demographic:
             fig_age.update_traces(textfont_color="#000000", textposition="auto")
             fig_age.update_layout(
                 margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
-                yaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
+                xaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
+                yaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
                 font=dict(color="#000000"), showlegend=False
             )
             st.plotly_chart(fig_age, use_container_width=True)
@@ -473,8 +473,8 @@ with tab_demographic:
                     fig_q.update_traces(textfont_color="#000000")
                     fig_q.update_layout(
                         margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                        xaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
-                        yaxis=dict(autorange="reversed", color="#000000", title=dict(font=dict(color="#000000"))),
+                        xaxis=dict(color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
+                        yaxis=dict(autorange="reversed", color="#000000", tickfont=dict(color="#000000"), title=dict(font=dict(color="#000000"))),
                         font=dict(color="#000000")
                     )
                     st.plotly_chart(fig_q, use_container_width=True)
