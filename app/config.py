@@ -2,13 +2,13 @@ import os
 from contextlib import contextmanager
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker
 
 # Tải các biến môi trường từ tệp .env (nếu có)
 load_dotenv()
 
 DB_USER = os.getenv("DB_USER", "avnadmin")
-DB_PASS = os.getenv("DB_PASS", "")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "") 
 DB_HOST = os.getenv("DB_HOST", "mysql-321e57ce-nguyenducquang1220444-2eb3.i.aivencloud.com")
 DB_PORT = os.getenv("DB_PORT", "23932")
 DB_NAME = os.getenv("DB_NAME", "defaultdb")
@@ -16,7 +16,7 @@ DB_NAME = os.getenv("DB_NAME", "defaultdb")
 # Chuỗi kết nối SQLAlchemy cho MySQL
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
+    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}?charset=utf8mb4"
 )
 
 # --- Cấu hình kết nối SSL tới Aiven ---
@@ -35,8 +35,6 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600, conn
 
 # Khởi tạo Session Factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
 
 @contextmanager
 def get_db():

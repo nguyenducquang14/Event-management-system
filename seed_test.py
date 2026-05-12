@@ -3,9 +3,8 @@ Script tự động tạo dữ liệu mẫu (Admin, Organizer, Guest) để test
 Mật khẩu chung cho tất cả tài khoản test là: 123456
 """
 from sqlalchemy import text
-from app.config import get_db, engine, Base
-import app.models  # Nhận diện cấu trúc các bảng nghiệp vụ
-from app.database.auth_models import register_user, Base as AuthBase
+from app.config import get_db
+from app.database.auth_models import register_user
 
 test_users = [
     # --- TÀI KHOẢN ADMIN ---
@@ -398,11 +397,6 @@ def seed_events_data(db):
     print("✅ Đã sinh dữ liệu Đăng ký (Registrations) & Tài chính (Finances) cực kỳ phong phú cho tất cả sự kiện!")
 
 def seed_all_test_data():
-    print("🚀 Đang kiểm tra và khởi tạo cấu trúc các bảng trong Database...")
-    AuthBase.metadata.create_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
-    print("✅ Đã tạo cấu trúc bảng thành công!")
-
     with get_db() as db:
         from app.database.auth_models import User, hash_password
         for username, password, fullname, email, role in test_users:

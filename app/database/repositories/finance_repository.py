@@ -137,13 +137,11 @@ class FinanceRepository(BaseRepository):
 
     @staticmethod
     def get_net_balance(event_id: int) -> float:
-        """Số dư ròng."""
-        sql = """
-            SELECT (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = :eid AND type = 'Income') - 
-                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = :eid AND type = 'Expense') AS result
-        """
-        row = BaseRepository.execute_query(sql, {"eid": event_id}, fetch="one")
-        return float(row["result"]) if row else 0.0
+        """Số dư ròng qua fn_event_balance."""
+        val = BaseRepository.call_function(
+            "fn_event_balance(:eid)", {"eid": event_id}
+        )
+        return float(val) if val is not None else 0.0
 
     @staticmethod
     def get_total_income_all() -> float:

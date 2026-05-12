@@ -27,8 +27,8 @@ class EventRepository(BaseRepository):
                    e.start_time, e.end_time,
                    v.venue_name, o.organizer_name,
                    e.status, e.max_capacity,
-                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS current_registered,
-                   COALESCE(e.max_capacity - (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 99999) AS slots_remaining
+                   fn_count_registered(e.event_id)   AS current_registered,
+                   fn_slots_remaining(e.event_id)    AS slots_remaining
             FROM Events e
             JOIN Venues     v ON e.venue_id     = v.venue_id
             JOIN Organizers o ON e.organizer_id = o.organizer_id
@@ -47,10 +47,10 @@ class EventRepository(BaseRepository):
             SELECT e.*,
                    v.venue_name, v.address AS venue_address, v.capacity AS venue_capacity,
                    o.organizer_name, o.email AS organizer_email,
-                   COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct,
-                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance,
-                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS current_registered,
-                   COALESCE(e.max_capacity - (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 99999) AS slots_remaining
+                   fn_attendance_rate(e.event_id)   AS attendance_rate_pct,
+                   fn_event_balance(e.event_id)     AS net_balance,
+                   fn_count_registered(e.event_id) AS current_registered,
+                   fn_slots_remaining(e.event_id)  AS slots_remaining
             FROM Events e
             JOIN Venues     v ON e.venue_id     = v.venue_id
             JOIN Organizers o ON e.organizer_id = o.organizer_id
@@ -146,23 +146,19 @@ class EventRepository(BaseRepository):
 
     @staticmethod
     def get_attendance_rate(event_id: int) -> float:
-        """Tỉ lệ tham dự (%)."""
-        sql = """
-            SELECT COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = :eid AND attendance_status = 'Attended') / 
-                   NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = :eid), 0) * 100, 0) AS result
-        """
-        row = BaseRepository.execute_query(sql, {"eid": event_id}, fetch="one")
-        return float(row["result"]) if row else 0.0
+        """Tỉ lệ tham dự (%) qua fn_attendance_rate."""
+        val = BaseRepository.call_function(
+            "fn_attendance_rate(:eid)", {"eid": event_id}
+        )
+        return float(val) if val is not None else 0.0
 
     @staticmethod
     def get_net_balance(event_id: int) -> float:
-        """Số dư tài chính."""
-        sql = """
-            SELECT (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = :eid AND type = 'Income') - 
-                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = :eid AND type = 'Expense') AS result
-        """
-        row = BaseRepository.execute_query(sql, {"eid": event_id}, fetch="one")
-        return float(row["result"]) if row else 0.0
+        """Số dư tài chính qua fn_event_balance."""
+        val = BaseRepository.call_function(
+            "fn_event_balance(:eid)", {"eid": event_id}
+        )
+        return float(val) if val is not None else 0.0
 
     @staticmethod
     def mark_completed(event_id: int) -> ProcedureResult:

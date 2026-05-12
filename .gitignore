@@ -10,3 +10,4 @@ exports/
 venv/
 .venv/
 .env
+ca.pem
