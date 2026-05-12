@@ -83,10 +83,11 @@ selected_event_id = st.selectbox("Chọn sự kiện để tương tác:", optio
 
 st.markdown("---")
 
-tab_agenda, tab_network, tab_match, tab_qa = st.tabs([
+tab_agenda, tab_network, tab_match, tab_qr, tab_qa = st.tabs([
     "📅 Lịch trình Sự kiện", 
     "👥 Danh bạ Người tham dự",
     "✨ Gợi ý Kết nối",
+    "📱 Quét Mã QR",
     "💬 Hỏi đáp (Q&A)"
 ])
 

@@ -86,9 +86,11 @@ selected_event = next(ev for ev in past_events if ev.event_id == selected_event_
 
 st.markdown("---")
 
-tab_resource, tab_review = st.tabs([
+tab_resource, tab_review, tab_analytics, tab_crm = st.tabs([
     "📥 Tài liệu & Chứng nhận",
-    "📝 Phản hồi Sự kiện"
+    "📝 Phản hồi Sự kiện",
+    "📊 Phân tích Tương tác",
+    "🔗 Tích hợp CRM"
 ])
 
 # --- CÁC HÀM RENDER PHIẾU KHẢO SÁT CHUYÊN BIỆT ---
