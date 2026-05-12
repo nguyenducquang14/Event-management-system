@@ -13,6 +13,7 @@ import time as time_lib
 from app.database.repositories.organizer_repo import OrganizerRepository
 from app.ui.components import styled_df
 from app.config import get_db
+from app.ui.styles import CUSTOM_CSS # Import CUSTOM_CSS
 from sqlalchemy import text
 
 st.set_page_config(page_title="Dashboard Ban Tổ Chức", page_icon="⚙️", layout="wide")
