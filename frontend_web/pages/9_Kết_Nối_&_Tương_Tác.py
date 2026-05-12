@@ -103,7 +103,7 @@ with tab_agenda:
         st.markdown("**10:45 - 12:00** | Tọa đàm chuyên sâu (Panel Discussion)")
         st.button("Lưu lịch trình vào Google Calendar", icon=":material/event:")
 
--# HÀM POP-UP GỬI LỜI MỜI KẾT NỐI
+# HÀM POP-UP GỬI LỜI MỜI KẾT NỐI
 @st.dialog("Gửi lời mời Hẹn gặp (Networking)")
 def meeting_dialog(guest_name, company):
     st.markdown(f"Gửi lời mời gặp mặt tới **{guest_name}** ({company or 'Cá nhân'})")
