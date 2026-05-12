@@ -551,7 +551,7 @@ with tab_guest:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 3: ĐỊA ĐIỂM
+# TAB 5: ĐỊA ĐIỂM
 # ════════════════════════════════════════════════════════════
 with tab_venue:
     section(":material/apartment:", "Thống kê sử dụng địa điểm")
@@ -609,7 +609,7 @@ with tab_venue:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 4: TÀI CHÍNH
+# TAB 6: TÀI CHÍNH
 # ════════════════════════════════════════════════════════════
 with tab_finance:
     section(":material/payments:", "Báo cáo tài chính tổng hợp")
@@ -662,7 +662,7 @@ with tab_finance:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 5: BÁO CÁO KỲ
+# TAB 7: BÁO CÁO KỲ
 # ════════════════════════════════════════════════════════════
 with tab_period:
     section(":material/calendar_month:", "Báo cáo sự kiện theo khoảng thời gian",
@@ -736,7 +736,7 @@ with tab_period:
 
 
 # ════════════════════════════════════════════════════════════
-# TAB 6: XUẤT EXCEL
+# TAB 8: XUẤT EXCEL
 # ════════════════════════════════════════════════════════════
 with tab_excel:
     section(":material/download:", "Xuất báo cáo Excel (.xlsx)", "Chọn sheet, tạo file và tải về ngay")
