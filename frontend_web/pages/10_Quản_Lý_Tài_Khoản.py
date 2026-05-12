@@ -78,7 +78,12 @@ st.title(":material/manage_accounts: Quản Lý Tài Khoản Cá Nhân")
 verified_badge = "✅ (Đã xác minh KYC)" if guest_record.get("is_verified") else "⚠️ (Chưa xác minh KYC)"
 st.markdown(f"**Hồ sơ của:** {guest_record.get('guest_name')} {verified_badge}")
 
-tab_profile = st.tabs(["👤 Thông tin Hồ sơ"])[0]
+tab_profile, tab_showcase, tab_team, tab_kyc = st.tabs([
+    "👤 Thông tin Hồ sơ",
+    "🏪 Gian hàng ảo",
+    "👥 Quản lý Nhóm",
+    "✅ Xác minh KYC"
+])
 
 # TAB 1: PROFILE
 with tab_profile:
