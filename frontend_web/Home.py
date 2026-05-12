@@ -4,8 +4,8 @@ Trang chủ và Màn hình Đăng nhập của ứng dụng Web Streamlit
 """
 import streamlit as st
 from app.database.auth_models import login_user, register_user, Base as AuthBase, seed_data
-from app.config import get_db, engine # Assuming app.config is where get_db and engine are defined
-from app.ui.styles import CUSTOM_CSS, GUEST_CSS # Import GUEST_CSS from styles.py
+from app.config import get_db, engine
+from app.ui.styles import CUSTOM_CSS
 from sqlalchemy import text
 import time
 
@@ -24,6 +24,31 @@ def init_auth_db():
         seed_data(db_session)
 
 init_auth_db()
+
+# CSS để ẩn Sidebar và ép theme cho các trang chưa đăng nhập
+GUEST_CSS = """
+<style>
+    /* Ẩn hoàn toàn sidebar và nút mở sidebar */
+    [data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"] { display: none !important; }
+    
+    /* Đặt nền mặc định là #F8FAFC */
+    .stApp {
+        background-color: #F8FAFC !important;
+    }
+    
+    /* Đặt chữ mặc định là màu đen cho tất cả thành phần (danh sách, chữ đậm, thông báo, radio buttons) */
+    .stMarkdownContainer, .stMarkdownContainer p, h1, h2, h3, h4, h5, h6, label, li, strong, b, .stAlert p, .stRadio p, .stRadio span, .stRadio div {
+        color: #000000 !important;
+    }
+    
+    /* Đặt nền trắng và chữ đen cho các ô nhập liệu */
+    input, div[data-baseweb="input"], div[data-baseweb="input"] > div {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+</style>
+"""
 
 def render_landing_page():
     # Dùng layout wide và cột space lớn để ép 2 nút ra góc ngoài cùng bên phải

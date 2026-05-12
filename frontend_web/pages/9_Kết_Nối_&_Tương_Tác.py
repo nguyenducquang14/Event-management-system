@@ -9,7 +9,18 @@ from app.config import get_db
 from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Kết Nối & Tương Tác", page_icon="🤝", layout="wide")
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True) # Apply the centralized CUSTOM_CSS
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# --- CSS ÉP MÀU TRẮNG CHO KHUNG NHẬP LIỆU ---
+st.markdown("""
+<style>
+    input, div[data-baseweb="input"], div[data-baseweb="input"] > div,
+    textarea, div[data-baseweb="textarea"], div[data-baseweb="textarea"] > div {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 if "token" not in st.session_state or "user_info" not in st.session_state:
     st.switch_page("Home.py")
