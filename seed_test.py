@@ -2,6 +2,20 @@
 Script tự động tạo dữ liệu mẫu (Admin, Organizer, Guest) để test hệ thống
 Mật khẩu chung cho tất cả tài khoản test là: 123456
 """
+import os
+import json
+import getpass
+import urllib.parse
+from dotenv import load_dotenv
+load_dotenv(override=True)  # Ép tải và ghi đè các biến môi trường từ file .env
+
+# Kiểm tra biến môi trường DB_PASSWORD (phải khớp với tên biến trong app/config.py)
+if not os.getenv("DB_PASSWORD") and not os.getenv("DATABASE_URL"):
+    print("⚠️ Không tìm thấy biến DB_PASSWORD trong file .env")
+    # Yêu cầu nhập mật khẩu an toàn từ Terminal (không lộ mật khẩu lên màn hình và git)
+    db_pass = getpass.getpass("🔑 Vui lòng nhập mật khẩu Database (sẽ bị ẩn khi gõ): ").strip()
+    os.environ["DB_PASSWORD"] = urllib.parse.quote_plus(db_pass)
+
 from sqlalchemy import text
 from app.config import get_db
 from app.database.auth_models import register_user
@@ -321,21 +335,52 @@ def seed_events_data(db):
         ("guest10@example.com", "Ngô Quốc Khánh", "Nghiên cứu sinh", "ĐHQGHN", "0910987654")
     ]
     
+    # Cập nhật schema Guests, Registrations, Feedbacks
+    for col, col_type in [("job_title", "VARCHAR(150)"), ("company", "VARCHAR(150)"), ("gender", "VARCHAR(20)"), ("dob", "DATE")]:
+        try:
+            db.execute(text(f"ALTER TABLE Guests ADD COLUMN {col} {col_type}"))
+        except Exception:
+            pass
+
     try:
-        db.execute(text("ALTER TABLE Guests ADD COLUMN job_title VARCHAR(150), ADD COLUMN company VARCHAR(150)"))
+        db.execute(text("ALTER TABLE Registrations ADD COLUMN group_details JSON"))
     except Exception:
         pass
-        
+
+    try:
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS Feedbacks (
+                feedback_id INT AUTO_INCREMENT PRIMARY KEY,
+                event_id INT NOT NULL,
+                guest_id INT NOT NULL,
+                rating INT NOT NULL,
+                comment TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (event_id) REFERENCES Events(event_id) ON DELETE CASCADE,
+                FOREIGN KEY (guest_id) REFERENCES Guests(guest_id) ON DELETE CASCADE
+            )
+        """))
+    except Exception:
+        pass
+
+    for col, col_type in [("rating_content", "INT"), ("rating_logistics", "INT"), ("nps_score", "INT"), ("comment_liked", "TEXT"), ("comment_improve", "TEXT"), ("future_topics", "TEXT"), ("details_json", "JSON")]:
+        try:
+            db.execute(text(f"ALTER TABLE Feedbacks ADD COLUMN {col} {col_type}"))
+        except Exception:
+            pass
+
     guest_ids = []
     for email, name, job, comp, phone in guest_list:
+        gender = random.choice(["Nam", "Nữ", "Khác"])
+        dob = f"{random.randint(1980, 2005)}-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}"
         g = db.execute(text("SELECT guest_id FROM Guests WHERE email = :email"), {"email": email}).fetchone()
         if not g:
-            db.execute(text("INSERT INTO Guests (guest_name, email, job_title, company, phone_number) VALUES (:name, :email, :job, :comp, :phone)"), 
-                       {"name": name, "email": email, "job": job, "comp": comp, "phone": phone})
+            db.execute(text("INSERT INTO Guests (guest_name, email, job_title, company, phone_number, gender, dob) VALUES (:name, :email, :job, :comp, :phone, :gender, :dob)"), 
+                       {"name": name, "email": email, "job": job, "comp": comp, "phone": phone, "gender": gender, "dob": dob})
             g = db.execute(text("SELECT guest_id FROM Guests WHERE email = :email"), {"email": email}).fetchone()
         else:
-            db.execute(text("UPDATE Guests SET job_title = :job, company = :comp, phone_number = :phone WHERE email = :email"), 
-                       {"job": job, "comp": comp, "phone": phone, "email": email})
+            db.execute(text("UPDATE Guests SET job_title = :job, company = :comp, phone_number = :phone, gender = :gender, dob = :dob WHERE email = :email"), 
+                       {"job": job, "comp": comp, "phone": phone, "gender": gender, "dob": dob, "email": email})
         guest_ids.append(g.guest_id)
         
     print("✅ Đã tạo Khách mời (Guests) cùng thông tin Công ty & Chức danh!")
@@ -358,14 +403,30 @@ def seed_events_data(db):
         selected_guests = random.sample(guest_ids, num_regs)
         
         for gid in selected_guests:
+            guest_name_row = db.execute(text("SELECT guest_name, email FROM Guests WHERE guest_id = :gid"), {"gid": gid}).fetchone()
+            g_name = guest_name_row.guest_name if guest_name_row else "Unknown"
+            g_email = guest_name_row.email if guest_name_row else ""
+            referrals = ["Facebook", "Website", "Bạn bè giới thiệu", "LinkedIn", "Email Marketing"]
+            group_details_json = json.dumps([{"name": g_name, "email": g_email, "custom": {"Bạn biết đến sự kiện qua đâu?": random.choice(referrals)}}], ensure_ascii=False)
+
             reg = db.execute(text("SELECT registration_id FROM Registrations WHERE event_id = :eid AND guest_id = :gid"), {"eid": eid, "gid": gid}).fetchone()
+            att = 'Registered'
+            if status == 'Completed' or event_name == 'Sự kiện Đã kết thúc: Lễ trao giải NEU 2025':
+                att = 'Attended' if random.random() > 0.25 else 'No-show'
+
             if not reg:
-                att = 'Registered'
-                if status == 'Completed' or event_name == 'Sự kiện Đã kết thúc: Lễ trao giải NEU 2025':
-                    att = 'Attended' if random.random() > 0.25 else 'No-show'
-                db.execute(text("INSERT INTO Registrations (event_id, guest_id, attendance_status) VALUES (:eid, :gid, :att)"), 
-                           {"eid": eid, "gid": gid, "att": att})
+                db.execute(text("INSERT INTO Registrations (event_id, guest_id, attendance_status, group_details) VALUES (:eid, :gid, :att, :g_details)"), 
+                           {"eid": eid, "gid": gid, "att": att, "g_details": group_details_json})
+            else:
+                db.execute(text("UPDATE Registrations SET group_details = :g_details, attendance_status = :att WHERE registration_id = :rid"), 
+                           {"g_details": group_details_json, "att": att, "rid": reg.registration_id})
                            
+            if att == 'Attended':
+                fb = db.execute(text("SELECT feedback_id FROM Feedbacks WHERE event_id = :eid AND guest_id = :gid"), {"eid": eid, "gid": gid}).fetchone()
+                if not fb:
+                    details = {"Chất lượng nội dung": "Cực kỳ thiết thực và giá trị", "Kỹ năng thuyết trình": "Thu hút, làm chủ sân khấu tốt"}
+                    db.execute(text("INSERT INTO Feedbacks (event_id, guest_id, rating, rating_content, rating_logistics, nps_score, comment, comment_liked, comment_improve, future_topics, details_json) VALUES (:eid, :gid, :rating, 4, 5, 9, 'Sự kiện rất tốt!', 'Nội dung hay', 'Nên dài hơn', 'Chủ đề tương lai', :details)"), {"eid": eid, "gid": gid, "rating": random.choice([4, 5]), "details": json.dumps(details, ensure_ascii=False)})
+
         # Sinh Tài chính
         fin_count = db.execute(text("SELECT COUNT(*) as count FROM Finances WHERE event_id = :eid"), {"eid": eid}).fetchone().count
         if fin_count == 0:

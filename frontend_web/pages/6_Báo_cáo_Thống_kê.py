@@ -356,11 +356,17 @@ with tab_demographic:
     with st.spinner("Đang phân tích dữ liệu khách hàng..."):
         # Đảm bảo các cột dữ liệu nhân khẩu và khảo sát tồn tại trong DB trước khi truy vấn
         from sqlalchemy import text
-        try:
-            with eng.begin() as conn:
-                conn.execute(text("ALTER TABLE Guests ADD COLUMN gender VARCHAR(20), ADD COLUMN dob DATE, ADD COLUMN job_title VARCHAR(150), ADD COLUMN company VARCHAR(150)"))
-        except Exception:
-            pass
+        for col, col_type in [
+            ("gender", "VARCHAR(20)"),
+            ("dob", "DATE"),
+            ("job_title", "VARCHAR(150)"),
+            ("company", "VARCHAR(150)")
+        ]:
+            try:
+                with eng.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE Guests ADD COLUMN {col} {col_type}"))
+            except Exception:
+                pass
             
         try:
             with eng.begin() as conn:
@@ -410,7 +416,7 @@ with tab_demographic:
             if "dob" in df_demo.columns and not df_demo["dob"].isnull().all():
                 df_demo["dob"] = pd.to_datetime(df_demo["dob"], errors="coerce")
                 now = pd.Timestamp.now()
-                df_demo["age"] = (now - df_demo["dob"]).astype('<m8[Y]')
+                df_demo["age"] = (now - df_demo["dob"]).dt.days / 365.25
                 
                 bins = [0, 18, 25, 35, 45, 60, 100]
                 labels = ["Dưới 18", "18-25", "26-35", "36-45", "46-60", "Trên 60"]
