@@ -15,7 +15,31 @@ from app.ui.components import section, stat_row, styled_df, show_success
 from app.ui.styles import CUSTOM_CSS
 
 st.set_page_config(page_title="Báo cáo | EMS", page_icon="📊", layout="wide")
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+GOLDEN_UI_CSS = """
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    html, body, [class*="st-"], .stMarkdownContainer, p, h1, h2, h3, h4, h5, h6, span, div, button, input, label, li { font-family: 'Inter', sans-serif !important; }
+    .block-container { padding: 2.5rem 3rem 4rem 3rem !important; max-width: 1200px !important; }
+    .stApp { background-color: #F8FAFC !important; }
+    h1, h2, h3, h4, h5, h6 { color: #0F172A !important; font-weight: 700 !important; }
+    p, span, label, li, .stMarkdownContainer { color: #334155 !important; }
+    button[kind="primary"] { background-color: #1E3A8A !important; color: #FFFFFF !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 1.5rem !important; font-weight: 600 !important; transition: all 0.2s ease-in-out !important; }
+    button[kind="primary"]:hover { background-color: #1E40AF !important; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3) !important; }
+    button[kind="primary"] p, button[kind="primary"] div { color: #FFFFFF !important; }
+    button[kind="secondary"] { background-color: #FFFFFF !important; color: #0F172A !important; border: 1px solid #CBD5E1 !important; border-radius: 8px !important; padding: 0.5rem 1.5rem !important; font-weight: 500 !important; transition: all 0.2s ease-in-out !important; }
+    button[kind="secondary"]:hover { background-color: #F1F5F9 !important; border-color: #94A3B8 !important; transform: translateY(-2px); }
+    button[kind="secondary"] p, button[kind="secondary"] div { color: #0F172A !important; }
+    div[data-testid="stForm"], div[data-testid="stVerticalBlockBorderWrapper"] > div, div[data-testid="metric-container"], .stAlert { background-color: #FFFFFF !important; border-radius: 12px !important; border: 1px solid #E2E8F0 !important; padding: 1.25rem !important; transition: box-shadow 0.3s ease-in-out, transform 0.3s ease !important; box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important; }
+    div[data-testid="stForm"]:hover, div[data-testid="stVerticalBlockBorderWrapper"] > div:hover, div[data-testid="metric-container"]:hover { box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01) !important; transform: translateY(-2px) !important; }
+    input, textarea, div[data-baseweb="select"] > div { background-color: #FFFFFF !important; border-radius: 8px !important; border: 1px solid #CBD5E1 !important; color: #0F172A !important; padding: 0.25rem 0.5rem !important; }
+    input:focus, textarea:focus, div[data-baseweb="select"] > div:focus-within { border-color: #1E3A8A !important; box-shadow: 0 0 0 1px #1E3A8A !important; }
+    [data-testid="stSidebar"] { background-color: #FFFFFF !important; border-right: 1px solid #E2E8F0 !important; }
+    div[data-testid="metric-container"] label { color: #64748B !important; font-weight: 500 !important; }
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] { color: #1E3A8A !important; font-weight: 700 !important; font-size: 2rem !important; }
+</style>
+"""
+st.markdown(CUSTOM_CSS + GOLDEN_UI_CSS, unsafe_allow_html=True)
 
 # 1. BỨC TƯỜNG LỬA
 if "token" not in st.session_state or "user_info" not in st.session_state:
@@ -70,7 +94,19 @@ st.markdown("## :material/analytics: Báo cáo & Thống kê")
 # ── Load dashboard stats ─────────────────────────────────────
 with st.spinner("Đang tải số liệu..."):
     if owner_id:
-        my_summary = db.events.execute_query(f"SELECT * FROM view_event_summary WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})") or []
+        my_summary = db.events.execute_query(f"""
+            SELECT e.event_id, e.event_name, e.start_time, e.status, v.venue_name,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'No-show') AS total_noshow,
+                   COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance
+            FROM Events e
+            LEFT JOIN Venues v ON e.venue_id = v.venue_id
+            WHERE e.organizer_id = {owner_id}
+        """) or []
         counts = db.events.execute_query(f"""
             SELECT 
                 COUNT(DISTINCT r.guest_id) as total_guests,
@@ -528,7 +564,14 @@ with tab_venue:
                 GROUP BY v.venue_id, v.venue_name, v.capacity, v.availability_status
             """) or []
         else:
-            venues = db.events.execute_query("SELECT * FROM view_venue_usage") or []
+            venues = db.events.execute_query("""
+                SELECT v.venue_id, v.venue_name, v.capacity, v.availability_status,
+                       COUNT(e.event_id) AS total_events,
+                       SUM(e.status = 'Completed') AS completed_events
+                FROM Venues v
+                LEFT JOIN Events e ON v.venue_id = e.venue_id
+                GROUP BY v.venue_id, v.venue_name, v.capacity, v.availability_status
+            """) or []
 
     if venues:
         df_v = pd.DataFrame(venues)
@@ -630,16 +673,33 @@ with tab_period:
         with st.spinner("Đang truy xuất dữ liệu..."):
             if owner_id:
                 rows = db.events.execute_query(f"""
-                    SELECT event_name, start_time, status, venue_name,
-                           total_registered, total_attended, attendance_rate_pct,
-                           total_income, total_expense, net_balance
-                    FROM view_event_summary
-                    WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})
-                    AND DATE(start_time) BETWEEN '{from_d}' AND '{to_d}'
-                    ORDER BY start_time
+                    SELECT e.event_name, e.start_time, e.status, v.venue_name,
+                           (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered,
+                           (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended,
+                           COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance
+                    FROM Events e
+                    LEFT JOIN Venues v ON e.venue_id = v.venue_id
+                    WHERE e.organizer_id = {owner_id}
+                    AND DATE(e.start_time) BETWEEN '{from_d}' AND '{to_d}'
+                    ORDER BY e.start_time
                 """) or []
             else:
-                rows = db.get_event_report(str(from_d), str(to_d))
+                rows = db.events.execute_query(f"""
+                    SELECT e.event_name, e.start_time, e.status, v.venue_name,
+                           (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered,
+                           (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended,
+                           COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense,
+                           (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance
+                    FROM Events e
+                    LEFT JOIN Venues v ON e.venue_id = v.venue_id
+                    WHERE DATE(e.start_time) BETWEEN '{from_d}' AND '{to_d}'
+                    ORDER BY e.start_time
+                """) or []
         if rows:
             df_r = pd.DataFrame(rows)
             st.caption(f"Tìm thấy {len(rows)} sự kiện từ {from_d} đến {to_d}")
@@ -680,26 +740,26 @@ with tab_excel:
 
     if owner_id:
         SHEET_QUERIES = {
-            "📋 Tổng hợp sự kiện":   f"SELECT * FROM view_event_summary WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})",
-            "💰 Báo cáo tài chính":  f"SELECT * FROM view_finance_report WHERE event_id IN (SELECT event_id FROM Events WHERE organizer_id = {owner_id})",
+            "📋 Tổng hợp sự kiện":   f"SELECT e.event_id, e.event_name, e.start_time, e.status, v.venue_name, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'No-show') AS total_noshow, COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance FROM Events e LEFT JOIN Venues v ON e.venue_id = v.venue_id WHERE e.organizer_id = {owner_id} ORDER BY e.start_time",
+            "💰 Báo cáo tài chính":  f"SELECT f.finance_id, e.event_name, f.type, f.amount, f.description, f.transaction_date, f.created_by FROM Finances f LEFT JOIN Events e ON f.event_id = e.event_id WHERE e.organizer_id = {owner_id}",
             "👥 Danh sách khách":    f"SELECT DISTINCT g.guest_id, g.guest_name, g.email, g.phone_number, g.address, g.created_at FROM Guests g JOIN Registrations r ON g.guest_id = r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id}",
             "🏢 Địa điểm":           f"SELECT v.venue_name, COUNT(e.event_id) as total_events FROM Venues v JOIN Events e ON v.venue_id = e.venue_id WHERE e.organizer_id = {owner_id} GROUP BY v.venue_name",
-            "✅ Đăng ký (an toàn)":  f"SELECT * FROM v_safe_registrations WHERE event_name IN (SELECT event_name FROM Events WHERE organizer_id = {owner_id})",
-            "🏆 Top khách":          f"SELECT g.guest_name, g.email, COUNT(r.event_id) AS total_reg, SUM(r.attendance_status='Attended') AS total_attended FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id} GROUP BY g.guest_id ORDER BY total_reg DESC",
+            "✅ Đăng ký (an toàn)":  f"SELECT r.registration_id AS reg_id, e.event_name, e.start_time, g.guest_id, g.guest_name, CONCAT(LEFT(g.email, 2), '***', SUBSTRING_INDEX(g.email, '@', -1)) AS email_hint, r.registration_date, r.attendance_status, r.checkin_time FROM Registrations r JOIN Events e ON r.event_id = e.event_id JOIN Guests g ON r.guest_id = g.guest_id WHERE e.organizer_id = {owner_id}",
+            "🏆 Top khách":          f"SELECT g.guest_name, g.email, COUNT(r.event_id) AS total_reg, SUM(r.attendance_status='Attended') AS total_attended FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id JOIN Events e ON r.event_id = e.event_id WHERE e.organizer_id = {owner_id} GROUP BY g.guest_id, g.guest_name, g.email ORDER BY total_reg DESC",
         }
     else:
         SHEET_QUERIES = {
-            "📋 Tổng hợp sự kiện":   "SELECT * FROM view_event_summary",
-            "💰 Báo cáo tài chính":  "SELECT * FROM view_finance_report",
+            "📋 Tổng hợp sự kiện":   "SELECT e.event_id, e.event_name, e.start_time, e.status, v.venue_name, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended, (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'No-show') AS total_noshow, COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense, (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance FROM Events e LEFT JOIN Venues v ON e.venue_id = v.venue_id ORDER BY e.start_time",
+            "💰 Báo cáo tài chính":  "SELECT f.finance_id, e.event_name, f.type, f.amount, f.description, f.transaction_date, f.created_by FROM Finances f LEFT JOIN Events e ON f.event_id = e.event_id",
             "👥 Danh sách khách":    "SELECT guest_id,guest_name,email,phone_number,address,created_at FROM Guests ORDER BY guest_name",
-            "🏢 Địa điểm":           "SELECT * FROM view_venue_usage",
-            "✅ Đăng ký (an toàn)":  "SELECT * FROM v_safe_registrations",
+            "🏢 Địa điểm":           "SELECT v.venue_id, v.venue_name, v.capacity, v.availability_status, COUNT(e.event_id) AS total_events, SUM(e.status = 'Completed') AS completed_events FROM Venues v LEFT JOIN Events e ON v.venue_id = e.venue_id GROUP BY v.venue_id, v.venue_name, v.capacity, v.availability_status",
+            "✅ Đăng ký (an toàn)":  "SELECT r.registration_id AS reg_id, e.event_name, e.start_time, g.guest_id, g.guest_name, CONCAT(LEFT(g.email, 2), '***', SUBSTRING_INDEX(g.email, '@', -1)) AS email_hint, r.registration_date, r.attendance_status, r.checkin_time FROM Registrations r JOIN Events e ON r.event_id = e.event_id JOIN Guests g ON r.guest_id = g.guest_id",
             "🏆 Top khách":          """
                 SELECT g.guest_name, g.email,
                        COUNT(r.event_id) AS total_reg,
                        SUM(r.attendance_status='Attended') AS total_attended
                 FROM Guests g JOIN Registrations r ON g.guest_id=r.guest_id
-                GROUP BY g.guest_id ORDER BY total_reg DESC
+                GROUP BY g.guest_id, g.guest_name, g.email ORDER BY total_reg DESC
             """,
         }
 
@@ -745,25 +805,4 @@ with tab_excel:
                         )
 
         from datetime import datetime
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fname = f"EMS_Report_{ts}.xlsx"
-
-        st.download_button(
-            "Tải file Excel",
-            data=buf.getvalue(),
-            file_name=fname,
-            icon=":material/download:",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-        show_success(
-            f"File '{fname}' đã sẵn sàng — "
-            f"{len(selected_sheets) + (1 if include_summary else 0)} sheets"
-        )
-
-        # Preview
-        st.divider()
-        st.markdown("**Preview — Tổng hợp sự kiện:**")
-        preview = summary
-        if preview:
-            styled_df(preview[:5], height=200)
+   

@@ -31,23 +31,39 @@ class FinanceRepository(BaseRepository):
 
     @staticmethod
     def get_all_report() -> list[dict]:
-        """Toàn bộ giao dịch kèm tên sự kiện — từ view_finance_report."""
-        return BaseRepository.execute_query(
-            "SELECT * FROM view_finance_report"
-        )
+        """Toàn bộ giao dịch kèm tên sự kiện."""
+        return BaseRepository.execute_query("""
+            SELECT f.finance_id, e.event_name, f.type, f.amount, f.description, f.transaction_date, f.created_by
+            FROM Finances f
+            LEFT JOIN Events e ON f.event_id = e.event_id
+        """)
 
     @staticmethod
     def get_balance_all() -> list[dict]:
-        """Số dư thu-chi từng sự kiện — từ v_finance_balance."""
-        return BaseRepository.execute_query(
-            "SELECT * FROM v_finance_balance ORDER BY net_balance DESC"
-        )
+        """Số dư thu-chi từng sự kiện."""
+        return BaseRepository.execute_query("""
+            SELECT e.event_id, e.event_name,
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) as total_income,
+                   COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as total_expense,
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) - COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as net_balance
+            FROM Events e
+            LEFT JOIN Finances f ON e.event_id = f.event_id
+            GROUP BY e.event_id, e.event_name
+            ORDER BY net_balance DESC
+        """)
 
     @staticmethod
     def get_balance_by_event(event_id: int) -> dict | None:
         """Số dư tài chính một sự kiện cụ thể."""
         return BaseRepository.execute_query("""
-            SELECT * FROM v_finance_balance WHERE event_id = :eid
+            SELECT e.event_id, e.event_name,
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) as total_income,
+                   COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as total_expense,
+                   COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount END),0) - COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount END),0) as net_balance
+            FROM Events e
+            LEFT JOIN Finances f ON e.event_id = f.event_id
+            WHERE e.event_id = :eid
+            GROUP BY e.event_id, e.event_name
         """, {"eid": event_id}, fetch="one")
 
     @staticmethod

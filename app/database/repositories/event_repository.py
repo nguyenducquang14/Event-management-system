@@ -59,13 +59,32 @@ class EventRepository(BaseRepository):
 
     @staticmethod
     def get_upcoming() -> list[dict]:
-        """Lấy sự kiện sắp diễn ra từ View v_upcoming_events."""
-        return BaseRepository.execute_query("SELECT * FROM view_upcoming_events")
+        """Lấy sự kiện sắp diễn ra."""
+        return BaseRepository.execute_query("""
+            SELECT e.*, v.venue_name
+            FROM Events e
+            LEFT JOIN Venues v ON e.venue_id = v.venue_id
+            WHERE e.start_time > NOW() AND e.status = 'Scheduled'
+            ORDER BY e.start_time ASC
+        """)
 
     @staticmethod
     def get_summary() -> list[dict]:
-        """Tổng hợp thống kê từng sự kiện (view_event_summary)."""
-        return BaseRepository.execute_query("SELECT * FROM view_event_summary ORDER BY start_time")
+        """Tổng hợp thống kê từng sự kiện."""
+        sql = """
+            SELECT e.event_id, e.event_name, e.start_time, e.status, v.venue_name,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id) AS total_registered,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') AS total_attended,
+                   (SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'No-show') AS total_noshow,
+                   COALESCE((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id AND attendance_status = 'Attended') / NULLIF((SELECT COUNT(*) FROM Registrations WHERE event_id = e.event_id), 0) * 100, 0) AS attendance_rate_pct,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') AS total_income,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS total_expense,
+                   (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Income') - (SELECT COALESCE(SUM(amount), 0) FROM Finances WHERE event_id = e.event_id AND type = 'Expense') AS net_balance
+            FROM Events e
+            LEFT JOIN Venues v ON e.venue_id = v.venue_id
+            ORDER BY e.start_time
+        """
+        return BaseRepository.execute_query(sql)
 
     @staticmethod
     def search(keyword: str) -> list[dict]:

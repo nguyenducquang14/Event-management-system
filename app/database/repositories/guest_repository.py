@@ -62,15 +62,24 @@ class GuestRepository(BaseRepository):
         Trả về danh sách khách ĐÃ MASK thông tin nhạy cảm.
         Dùng cho checkin_staff — không lộ email/SĐT đầy đủ.
         """
-        return BaseRepository.execute_query(
-            "SELECT guest_id, guest_name, email_masked, phone_masked FROM v_safe_guests"
-        )
+        return BaseRepository.execute_query("""
+            SELECT guest_id, guest_name, 
+                   CONCAT(LEFT(email, 3), '***@', SUBSTRING_INDEX(email, '@', -1)) AS email_masked,
+                   CONCAT('*******', RIGHT(phone_number, 3)) AS phone_masked
+            FROM Guests
+        """)
 
     @staticmethod
     def get_activity(limit: int = 10) -> list[dict]:
-        """Top khách tích cực từ view_guest_activity."""
+        """Top khách tích cực."""
         return BaseRepository.execute_query("""
-            SELECT * FROM v_guest_activity
+            SELECT g.guest_id, g.guest_name, g.email,
+                   COUNT(r.event_id) AS total_registrations,
+                   SUM(r.attendance_status='Attended') AS total_attended,
+                   ROUND(SUM(r.attendance_status='Attended') / NULLIF(COUNT(r.event_id),0) * 100, 2) AS personal_rate_pct
+            FROM Guests g 
+            LEFT JOIN Registrations r ON g.guest_id=r.guest_id
+            GROUP BY g.guest_id, g.guest_name, g.email
             ORDER BY total_registrations DESC
             LIMIT :lim
         """, {"lim": limit})

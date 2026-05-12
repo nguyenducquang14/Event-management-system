@@ -70,10 +70,13 @@ class RegistrationRepository(BaseRepository):
     def get_safe_list(event_id: int) -> list[dict]:
         """Danh sách đăng ký đã mask thông tin nhạy cảm (cho checkin_staff)."""
         return BaseRepository.execute_query("""
-            SELECT * FROM v_safe_registrations
-            WHERE event_id = (
-                SELECT event_id FROM Events WHERE event_id = :eid
-            )
+            SELECT r.registration_id AS reg_id, e.event_name, e.start_time, g.guest_id, g.guest_name,
+                   CONCAT(LEFT(g.email, 2), '***', SUBSTRING_INDEX(g.email, '@', -1)) AS email_hint,
+                   r.registration_date, r.attendance_status, r.checkin_time
+            FROM Registrations r
+            JOIN Events e ON r.event_id = e.event_id
+            JOIN Guests g ON r.guest_id = g.guest_id
+            WHERE r.event_id = :eid
         """, {"eid": event_id})
 
     # ── REGISTER (gọi Stored Procedure) ─────────────────────
