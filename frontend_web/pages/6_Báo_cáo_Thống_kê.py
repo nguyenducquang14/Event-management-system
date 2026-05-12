@@ -401,46 +401,44 @@ with tab_demographic:
             if "gender" in df_demo.columns and not df_demo["gender"].isnull().all():
                 df_gender = df_demo["gender"].fillna("Chưa khai báo").value_counts().reset_index()
                 df_gender.columns = ["Giới tính", "Số lượng"]
-                fig_gender = px.pie(df_gender, names="Giới tính", values="Số lượng", hole=0.4,
-                                    color_discrete_sequence=px.colors.qualitative.Pastel)
-                fig_gender.update_layout(
-                    margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#000000")
-                )
-                st.plotly_chart(fig_gender, use_container_width=True)
             else:
-                st.info("Chưa có dữ liệu giới tính.")
+                df_gender = pd.DataFrame({"Giới tính": ["Chưa khai báo"], "Số lượng": [0]})
+                
+            fig_gender = px.pie(df_gender, names="Giới tính", values="Số lượng", hole=0.4,
+                                color_discrete_sequence=px.colors.qualitative.Pastel)
+            fig_gender.update_layout(
+                margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#000000")
+            )
+            st.plotly_chart(fig_gender, use_container_width=True)
 
         # 2. Độ tuổi
         with c2:
             st.markdown("#### 2. Phân bổ Độ tuổi")
+            bins = [0, 18, 25, 35, 45, 60, 100]
+            labels = ["Dưới 18", "18-25", "26-35", "36-45", "46-60", "Trên 60"]
+            
             if "dob" in df_demo.columns and not df_demo["dob"].isnull().all():
                 df_demo["dob"] = pd.to_datetime(df_demo["dob"], errors="coerce")
                 now = pd.Timestamp.now()
                 df_demo["age"] = (now - df_demo["dob"]).dt.days / 365.25
                 
-                bins = [0, 18, 25, 35, 45, 60, 100]
-                labels = ["Dưới 18", "18-25", "26-35", "36-45", "46-60", "Trên 60"]
                 df_demo["age_group"] = pd.cut(df_demo["age"], bins=bins, labels=labels, right=False)
                 
                 df_age = df_demo["age_group"].value_counts().reset_index()
                 df_age.columns = ["Độ tuổi", "Số lượng"]
-                df_age = df_age[df_age["Số lượng"] > 0]
-                
-                if not df_age.empty:
-                    fig_age = px.bar(df_age, x="Độ tuổi", y="Số lượng", text="Số lượng",
-                                     color="Độ tuổi", color_discrete_sequence=px.colors.qualitative.Set2)
-                    fig_age.update_traces(textfont_color="#000000", textposition="auto")
-                    fig_age.update_layout(
-                        margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                        xaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
-                        yaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
-                        font=dict(color="#000000"), showlegend=False
-                    )
-                    st.plotly_chart(fig_age, use_container_width=True)
-                else:
-                    st.info("Chưa có dữ liệu tính độ tuổi.")
             else:
-                st.info("Chưa có dữ liệu độ tuổi.")
+                df_age = pd.DataFrame({"Độ tuổi": labels, "Số lượng": [0]*len(labels)})
+                
+            fig_age = px.bar(df_age, x="Độ tuổi", y="Số lượng", text="Số lượng",
+                             color="Độ tuổi", color_discrete_sequence=px.colors.qualitative.Set2)
+            fig_age.update_traces(textfont_color="#000000", textposition="auto")
+            fig_age.update_layout(
+                margin=dict(l=0, r=0, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
+                yaxis=dict(color="#000000", title=dict(font=dict(color="#000000"))),
+                font=dict(color="#000000"), showlegend=False
+            )
+            st.plotly_chart(fig_age, use_container_width=True)
 
         st.divider()
 
