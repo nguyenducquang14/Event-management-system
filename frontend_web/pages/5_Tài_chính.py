@@ -333,7 +333,8 @@ with tab_detail:
                 for t in txns_income:
                     st.markdown(
                         f"<span class='material-symbols-rounded' style='color:#10b981;font-size:1.1rem;vertical-align:middle;'>check_circle</span> `{t['transaction_date']}` — "
-                        f"**{float(t['amount']):,.0f} VND** — {t.get('description','')}"
+                        f"**{float(t['amount']):,.0f} VND** — {t.get('description','')} ",
+                        unsafe_allow_html=True
                     )
             else:
                 st.info("Chưa có thu nhập.")
@@ -344,7 +345,8 @@ with tab_detail:
                 for t in txns_expense:
                     st.markdown(
                         f"<span class='material-symbols-rounded' style='color:#ef4444;font-size:1.1rem;vertical-align:middle;'>cancel</span> `{t['transaction_date']}` — "
-                        f"**{float(t['amount']):,.0f} VND** — {t.get('description','')}"
+                        f"**{float(t['amount']):,.0f} VND** — {t.get('description','')} ",
+                        unsafe_allow_html=True
                     )
             else:
                 st.info("Chưa có chi phí.")
