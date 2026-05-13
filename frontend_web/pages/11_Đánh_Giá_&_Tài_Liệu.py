@@ -274,36 +274,6 @@ def render_default_survey(event_id, guest_id):
 # TAB 1: REVIEW
 with tab_review:
     with get_db() as db:
-        # Tự động tạo bảng Feedbacks nếu chưa có để lưu trữ Đánh giá
-        try:
-            db.execute(text("""
-                CREATE TABLE IF NOT EXISTS Feedbacks (
-                    feedback_id INT AUTO_INCREMENT PRIMARY KEY,
-                    event_id INT NOT NULL,
-                    guest_id INT NOT NULL,
-                    rating INT NOT NULL,
-                    comment TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (event_id) REFERENCES Events(event_id) ON DELETE CASCADE,
-                    FOREIGN KEY (guest_id) REFERENCES Guests(guest_id) ON DELETE CASCADE
-                )
-            """))
-        except Exception:
-            pass
-            
-        # Mở rộng bảng Feedbacks để chứa các câu hỏi khảo sát chi tiết (chạy 1 lần)
-        try:
-            db.execute(text("ALTER TABLE Feedbacks ADD COLUMN rating_content INT, ADD COLUMN rating_logistics INT, ADD COLUMN nps_score INT, ADD COLUMN comment_liked TEXT, ADD COLUMN comment_improve TEXT, ADD COLUMN future_topics TEXT;"))
-            db.execute(text("ALTER TABLE Feedbacks ADD COLUMN nps_score INT, ADD COLUMN comment_liked TEXT, ADD COLUMN comment_improve TEXT, ADD COLUMN future_topics TEXT;"))
-        except Exception:
-            pass
-
-        # Thêm cột JSON để lưu các câu trả lời chi tiết, linh hoạt
-        try:
-            db.execute(text("ALTER TABLE Feedbacks ADD COLUMN details_json JSON;"))
-        except Exception:
-            pass
-            
         # Kiểm tra xem người dùng đã đánh giá chưa
         existing_feedback = db.execute(text("SELECT * FROM Feedbacks WHERE event_id = :eid AND guest_id = :gid"), 
                                        {"eid": selected_event_id, "gid": guest_id}).fetchone()

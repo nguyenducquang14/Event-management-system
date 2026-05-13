@@ -111,12 +111,6 @@ def refund_ticket_dialog(registration_id, event_name):
     if st.button("Gửi yêu cầu hoàn tiền", type="primary", use_container_width=True):
         with st.spinner("Đang gửi yêu cầu..."):
             with get_db() as db:
-                # Mở rộng ENUM của attendance_status nếu chưa có
-                try:
-                    db.execute(text("ALTER TABLE Registrations MODIFY COLUMN attendance_status ENUM('Registered', 'Attended', 'No-show', 'Refund Requested', 'Refunded') NOT NULL DEFAULT 'Registered'"))
-                except Exception:
-                    pass
-                
                 db.execute(text("UPDATE Registrations SET attendance_status = 'Refund Requested' WHERE registration_id = :rid"), {"rid": registration_id})
             st.success("Đã gửi yêu cầu hoàn tiền thành công! Trạng thái vé đã được cập nhật.")
             time.sleep(1.5)

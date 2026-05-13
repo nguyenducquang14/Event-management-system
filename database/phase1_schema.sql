@@ -37,12 +37,15 @@ CREATE TABLE Venues (
 -- BẢNG 2: ORGANIZERS
 -- ============================================================
 CREATE TABLE Organizers (
-    organizer_id   INT          NOT NULL AUTO_INCREMENT,
-    organizer_name VARCHAR(150) NOT NULL,
-    address        VARCHAR(200) NOT NULL,
-    phone_number   VARCHAR(15)  NOT NULL,
-    email          VARCHAR(100) NULL,
-    department     VARCHAR(100) NULL,
+    organizer_id        INT          NOT NULL AUTO_INCREMENT,
+    organizer_name      VARCHAR(150) NOT NULL,
+    address             VARCHAR(200) NOT NULL,
+    phone_number        VARCHAR(15)  NOT NULL,
+    email               VARCHAR(100) NULL,
+    department          VARCHAR(100) NULL,
+    bank_name           VARCHAR(100) NULL,
+    bank_account_number VARCHAR(50)  NULL,
+    bank_account_name   VARCHAR(150) NULL,
 
     CONSTRAINT pk_organizers   PRIMARY KEY (organizer_id),
     CONSTRAINT uq_org_email    UNIQUE (email)
@@ -55,21 +58,30 @@ CREATE TABLE Organizers (
 --          organizer_id (FK mới), max_capacity
 -- ============================================================
 CREATE TABLE Events (
-    event_id      INT          NOT NULL AUTO_INCREMENT,
-    event_name    VARCHAR(150) NOT NULL,
-    start_time    DATETIME     NOT NULL,
-    end_time      DATETIME     NOT NULL,
-    venue_id      INT          NOT NULL,
-    organizer_id  INT          NOT NULL,
-    status        ENUM(
+    event_id        INT          NOT NULL AUTO_INCREMENT,
+    event_name      VARCHAR(150) NOT NULL,
+    start_time      DATETIME     NOT NULL,
+    end_time        DATETIME     NOT NULL,
+    venue_id        INT          NOT NULL,
+    organizer_id    INT          NOT NULL,
+    status          ENUM(
                       'Draft',        -- Đang soạn thảo
                       'Scheduled',    -- Đã lên lịch
                       'Full',         -- Hết chỗ
                       'Completed',    -- Đã kết thúc
                       'Cancelled'     -- Đã hủy
                   ) NOT NULL DEFAULT 'Draft',
-    max_capacity  INT          NULL,   -- NULL = không giới hạn
-    description   TEXT         NULL,
+    max_capacity    INT          NULL,   -- NULL = không giới hạn
+    description     TEXT         NULL,
+    category        VARCHAR(50)    NULL DEFAULT 'Khác',
+    ticket_price    DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+    image_url       VARCHAR(500)   NULL,
+    event_type      VARCHAR(50)    DEFAULT 'Conference',
+    target_audience VARCHAR(50)    DEFAULT 'All',
+    is_private      BOOLEAN        DEFAULT FALSE,
+    access_code     VARCHAR(50)    DEFAULT NULL,
+    ticket_tiers    JSON           NULL,
+    custom_fields   JSON           NULL,
 
     CONSTRAINT pk_events         PRIMARY KEY (event_id),
     CONSTRAINT fk_event_venue    FOREIGN KEY (venue_id)
@@ -86,12 +98,25 @@ CREATE TABLE Events (
 -- BẢNG 4: GUESTS
 -- ============================================================
 CREATE TABLE Guests (
-    guest_id     INT          NOT NULL AUTO_INCREMENT,
-    guest_name   VARCHAR(100) NOT NULL,
-    email        VARCHAR(100) NOT NULL,
-    phone_number VARCHAR(15)  NULL,
-    address      VARCHAR(200) NULL,
-    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    guest_id         INT          NOT NULL AUTO_INCREMENT,
+    guest_name       VARCHAR(100) NOT NULL,
+    email            VARCHAR(100) NOT NULL,
+    phone_number     VARCHAR(15)  NULL,
+    address          VARCHAR(200) NULL,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_public        BOOLEAN      DEFAULT TRUE,
+    job_title        VARCHAR(150) NULL,
+    company          VARCHAR(150) NULL,
+    gender           VARCHAR(20)  NULL,
+    dob              DATE         NULL,
+    bio              TEXT         NULL,
+    linkedin_url     VARCHAR(255) NULL,
+    services_offered VARCHAR(255) NULL,
+    buying_intent    VARCHAR(255) NULL,
+    is_verified      BOOLEAN      DEFAULT FALSE,
+    kyc_status       VARCHAR(50)  DEFAULT 'Unverified',
+    portfolio_url    VARCHAR(500) NULL,
+    video_url        VARCHAR(500) NULL,
 
     CONSTRAINT pk_guests       PRIMARY KEY (guest_id),
     CONSTRAINT uq_guest_email  UNIQUE (email)
@@ -109,11 +134,14 @@ CREATE TABLE Registrations (
     guest_id          INT  NOT NULL,
     registration_date DATE NOT NULL DEFAULT (CURRENT_DATE),
     attendance_status ENUM(
-                          'Registered',   -- Đã đăng ký, chưa đến
-                          'Attended',     -- Đã tham dự
-                          'No-show'       -- Vắng mặt không báo
+                          'Registered', 'Attended', 'No-show', 'Refund Requested', 'Refunded'
                       ) NOT NULL DEFAULT 'Registered',
     checkin_time      DATETIME NULL,     -- Thời điểm check-in thực tế
+    ticket_count      INT          DEFAULT 1,
+    ticket_type       VARCHAR(50)  DEFAULT 'Standard',
+    vat_company       VARCHAR(150) NULL,
+    vat_tax_code      VARCHAR(50)  NULL,
+    group_details     JSON         NULL,
 
     CONSTRAINT pk_registrations   PRIMARY KEY (registration_id),
     CONSTRAINT uq_event_guest     UNIQUE (event_id, guest_id),
@@ -152,6 +180,28 @@ CREATE TABLE Finances (
 
 
 -- ============================================================
+-- BẢNG 7: FEEDBACKS (BỔ SUNG)
+-- Lưu trữ đánh giá, khảo sát của khách hàng sau sự kiện
+-- ============================================================
+CREATE TABLE Feedbacks (
+    feedback_id       INT AUTO_INCREMENT PRIMARY KEY,
+    event_id          INT NOT NULL,
+    guest_id          INT NOT NULL,
+    rating            INT NOT NULL,
+    comment           TEXT NULL,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    rating_content    INT NULL,
+    rating_logistics  INT NULL,
+    nps_score         INT NULL,
+    comment_liked     TEXT NULL,
+    comment_improve   TEXT NULL,
+    future_topics     TEXT NULL,
+    details_json      JSON NULL,
+    FOREIGN KEY (event_id) REFERENCES Events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (guest_id) REFERENCES Guests(guest_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 CREATE INDEX idx_event_start    ON Events(start_time);
@@ -166,6 +216,7 @@ CREATE INDEX idx_fin_event      ON Finances(event_id);
 CREATE INDEX idx_fin_type       ON Finances(type);
 CREATE INDEX idx_fin_date       ON Finances(transaction_date);
 CREATE INDEX idx_venue_status   ON Venues(availability_status);
+CREATE INDEX idx_feedback_event_guest ON Feedbacks(event_id, guest_id);
 
 
 -- ============================================================
@@ -198,31 +249,31 @@ INSERT INTO Organizers (organizer_name, address, phone_number, email, department
 ('Phòng GD&ĐT Q. Hai Bà Trưng',    '220 Phố Huế, HBT, HN','024 3974 3083','hbt@gd.edu.vn',              'Giáo dục'),
 ('Ban Tổ chức Techfest 2025',       '1 Đại Cồ Việt, HN',  '024 3869 2000', 'techfest@most.gov.vn',       'KH&CN');
 
--- Events (10 dòng) — dùng start_time + end_time + status mới
-INSERT INTO Events (event_name, start_time, end_time, venue_id, organizer_id, status, max_capacity, description) VALUES
-('Hội thảo Trí tuệ Nhân tạo 2025',         '2025-06-15 08:00:00', '2025-06-15 17:00:00', 1,  1,  'Scheduled',  400, 'Xu hướng AI tại Việt Nam.'),
-('Tech Talk NEU — Mùa 3',                   '2025-07-01 14:00:00', '2025-07-01 17:00:00', 2,  2,  'Draft',       70, 'Diễn đàn công nghệ sinh viên.'),
-('Ngày hội Việc làm IT 2025',               '2025-07-20 08:30:00', '2025-07-20 16:30:00', 3,  3,  'Scheduled',  500, '50+ doanh nghiệp tuyển dụng.'),
-('Workshop Python cho người mới',           '2025-05-10 09:00:00', '2025-05-10 12:00:00', 2,  2,  'Completed',   60, 'Python từ cơ bản đến nâng cao.'),
-('Seminar An ninh Mạng 2025',               '2025-05-25 13:30:00', '2025-05-25 17:00:00', 1,  1,  'Completed',  300, 'Mối đe dọa mạng năm 2025.'),
-('Gala Kỷ niệm 65 năm NEU',                 '2025-08-15 17:00:00', '2025-08-15 21:00:00', 5,  3,  'Scheduled',  700, 'Lễ kỷ niệm 65 năm thành lập NEU.'),
-('Cuộc thi CodeStorm — DATCOM',             '2025-09-05 08:00:00', '2025-09-05 18:00:00', 8,  2,  'Draft',      200, 'Thi lập trình thuật toán.'),
-('Hội nghị Chuyển đổi số DN',               '2025-06-30 08:00:00', '2025-06-30 17:00:00', 7,  10, 'Full',      2000, 'Chuyển đổi số từ tập đoàn lớn.'),
-('Khóa học Data Science Thực chiến',        '2025-07-15 09:00:00', '2025-07-16 17:00:00', 6,  6,  'Scheduled',  120, '2 ngày phân tích dữ liệu & ML.'),
-('Lễ tốt nghiệp Khóa 62 — NEU',            '2025-06-05 07:30:00', '2025-06-05 11:30:00', 5,  3,  'Completed', 1500, 'Lễ trao bằng khóa 62.');
+-- Events (10 dòng) — bổ sung các trường dữ liệu mới
+INSERT INTO Events (event_name, start_time, end_time, venue_id, organizer_id, status, max_capacity, description, category, ticket_price, image_url, event_type, target_audience, is_private, access_code) VALUES
+('Hội thảo Trí tuệ Nhân tạo 2025',         '2025-06-15 08:00:00', '2025-06-15 17:00:00', 1,  1,  'Scheduled',  400, 'Xu hướng AI tại Việt Nam.', 'Công nghệ', 50000.00, 'https://images.unsplash.com/photo-1535223289827-42f1e9919769?w=800', 'Conference', 'Specialist / Staff', TRUE, 'VIP2026'),
+('Tech Talk NEU — Mùa 3',                   '2025-07-01 14:00:00', '2025-07-01 17:00:00', 2,  2,  'Draft',       70, 'Diễn đàn công nghệ sinh viên.', 'Công nghệ', 0.00, 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800', 'Workshop', 'All', FALSE, NULL),
+('Ngày hội Việc làm IT 2025',               '2025-07-20 08:30:00', '2025-07-20 16:30:00', 3,  7,  'Scheduled',  500, '50+ doanh nghiệp tuyển dụng.', 'Công nghệ', 0.00, 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800', 'Trade Show', 'All', FALSE, NULL),
+('Workshop Python cho người mới',           '2025-05-10 09:00:00', '2025-05-10 12:00:00', 2,  2,  'Completed',   60, 'Python từ cơ bản đến nâng cao.', 'Giáo dục', 100000.00, 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=800', 'Workshop', 'All', FALSE, NULL),
+('Seminar An ninh Mạng 2025',               '2025-05-25 13:30:00', '2025-05-25 17:00:00', 1,  1,  'Completed',  300, 'Mối đe dọa mạng năm 2025.', 'Công nghệ', 50000.00, 'https://images.unsplash.com/photo-1526628953301-3e589a6a8b74?w=800', 'Conference', 'Specialist / Staff', FALSE, NULL),
+('Gala Kỷ niệm 65 năm NEU',                 '2025-08-15 17:00:00', '2025-08-15 21:00:00', 5,  3,  'Scheduled',  700, 'Lễ kỷ niệm 65 năm thành lập NEU.', 'Giải trí', 0.00, 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800', 'Networking', 'All', FALSE, NULL),
+('Cuộc thi CodeStorm — DATCOM',             '2025-09-05 08:00:00', '2025-09-05 18:00:00', 8,  2,  'Draft',      200, 'Thi lập trình thuật toán.', 'Công nghệ', 0.00, 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800', 'Workshop', 'All', FALSE, NULL),
+('Diễn đàn Kinh tế Cấp cao',               '2025-06-30 08:00:00', '2025-06-30 17:00:00', 7,  10, 'Full',      2000, 'Chuyển đổi số từ tập đoàn lớn.', 'Khác', 2000000.00, 'https://images.unsplash.com/photo-1560439514-4e28943a15ac?w=800', 'Conference', 'C-level / Executive', TRUE, 'VIP2026'),
+('Khóa học Data Science Thực chiến',        '2025-07-15 09:00:00', '2025-07-16 17:00:00', 6,  6,  'Scheduled',  120, '2 ngày phân tích dữ liệu & ML.', 'Giáo dục', 1500000.00, 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800', 'Workshop', 'Specialist / Staff', FALSE, NULL),
+('Lễ tốt nghiệp Khóa 62 — NEU',            '2025-06-05 07:30:00', '2025-06-05 11:30:00', 5,  3,  'Completed', 1500, 'Lễ trao bằng khóa 62.', 'Giáo dục', 0.00, 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800', 'Networking', 'All', FALSE, NULL);
 
 -- Guests (10 dòng)
-INSERT INTO Guests (guest_name, email, phone_number, address) VALUES
-('Nguyễn Văn An',    'an.nguyen@email.com',          '0901 234 567', '45 Phố Huế, Hai Bà Trưng, HN'),
-('Trần Thị Bình',    'binh.tran@gmail.com',           '0912 345 678', '12 Nguyễn Trãi, Thanh Xuân, HN'),
-('Lê Minh Cường',    'cuong.le@neu.edu.vn',           '0923 456 789', '207 Giải Phóng, HN'),
-('Phạm Thị Dung',    'dung.pham@student.neu.edu.vn',  '0934 567 890', '78 Bạch Mai, Hai Bà Trưng, HN'),
-('Hoàng Văn Em',     'em.hoang@fpt.com.vn',           '0945 678 901', '17 Duy Tân, Cầu Giấy, HN'),
-('Vũ Thị Phương',    'phuong.vu@gmail.com',           '0956 789 012', '33 Kim Mã, Ba Đình, HN'),
-('Đỗ Quang Giáp',    'giap.do@techco.vn',             '0967 890 123', '56 Láng Hạ, Đống Đa, HN'),
-('Ngô Thị Hoa',      'hoa.ngo@yahoo.com',             '0978 901 234', '89 Trần Duy Hưng, Cầu Giấy, HN'),
-('Bùi Đức Hùng',     'hung.bui@microsoft.com',        '0989 012 345', '25 Xuân Thủy, Cầu Giấy, HN'),
-('Lý Thị Kim Oanh',  'oanh.ly@gmail.com',             '0990 123 456', '101 Nguyễn Chí Thanh, Đống Đa, HN');
+INSERT INTO Guests (guest_name, email, phone_number, address, job_title, company) VALUES
+('Nguyễn Văn An',    'an.nguyen@email.com',          '0901 234 567', '45 Phố Huế, Hai Bà Trưng, HN', 'CEO', 'TechCorp'),
+('Trần Thị Bình',    'binh.tran@gmail.com',           '0912 345 678', '12 Nguyễn Trãi, Thanh Xuân, HN', 'Marketing Manager', 'AdSolutions'),
+('Lê Minh Cường',    'cuong.le@neu.edu.vn',           '0923 456 789', '207 Giải Phóng, HN', 'Sinh viên', 'Đại học Kinh tế Quốc dân'),
+('Phạm Thị Dung',    'dung.pham@student.neu.edu.vn',  '0934 567 890', '78 Bạch Mai, Hai Bà Trưng, HN', 'Sinh viên', 'Đại học Kinh tế Quốc dân'),
+('Hoàng Văn Em',     'em.hoang@fpt.com.vn',           '0945 678 901', '17 Duy Tân, Cầu Giấy, HN', 'Software Engineer', 'FPT Software'),
+('Vũ Thị Phương',    'phuong.vu@gmail.com',           '0956 789 012', '33 Kim Mã, Ba Đình, HN', 'HR Specialist', 'VietnamWorks'),
+('Đỗ Quang Giáp',    'giap.do@techco.vn',             '0967 890 123', '56 Láng Hạ, Đống Đa, HN', 'Project Manager', 'TechCo'),
+('Ngô Thị Hoa',      'hoa.ngo@yahoo.com',             '0978 901 234', '89 Trần Duy Hưng, Cầu Giấy, HN', 'Freelancer', NULL),
+('Bùi Đức Hùng',     'hung.bui@microsoft.com',        '0989 012 345', '25 Xuân Thủy, Cầu Giấy, HN', 'Cloud Architect', 'Microsoft Vietnam'),
+('Lý Thị Kim Oanh',  'oanh.ly@gmail.com',             '0990 123 456', '101 Nguyễn Chí Thanh, Đống Đa, HN', 'Accountant', 'KPMG');
 
 -- Registrations (10 dòng) — dùng attendance_status mới
 INSERT INTO Registrations (event_id, guest_id, registration_date, attendance_status, checkin_time) VALUES

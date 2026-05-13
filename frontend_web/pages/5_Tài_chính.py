@@ -106,15 +106,6 @@ tab_overview, tab_income, tab_expense, tab_detail, tab_period, tab_bank = st.tab
     ":material/account_balance: Tài khoản NH",
 ])
 
-# Đảm bảo bảng Organizers có các cột thông tin ngân hàng
-with get_db_session() as sess:
-    try:
-        sess.execute(text("ALTER TABLE Organizers ADD COLUMN bank_name VARCHAR(100), ADD COLUMN bank_account_number VARCHAR(50), ADD COLUMN bank_account_name VARCHAR(150)"))
-        sess.commit()
-    except Exception:
-        pass
-
-
 # ════════════════════════════════════════════════════════════
 # TAB 1: TỔNG HỢP
 # ════════════════════════════════════════════════════════════

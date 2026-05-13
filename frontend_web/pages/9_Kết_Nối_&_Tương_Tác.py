@@ -128,12 +128,6 @@ with tab_network:
     st.info("💡 **Bảo mật:** Liên hệ cá nhân sẽ được ẩn cho đến khi cả hai bên chấp nhận kết nối. Những người dùng đánh dấu ẩn hồ sơ sẽ không xuất hiện tại đây.")
     
     with get_db() as db:
-        # Đảm bảo bảng Guests có cột is_public
-        try:
-            db.execute(text("ALTER TABLE Guests ADD COLUMN is_public BOOLEAN DEFAULT TRUE"))
-        except Exception:
-            pass
-            
         try:
             other_guests = db.execute(text("""
                 SELECT g.guest_id, g.guest_name, g.email, g.job_title, g.company, g.bio, g.linkedin_url, g.services_offered, g.buying_intent, g.is_verified, g.portfolio_url, g.video_url

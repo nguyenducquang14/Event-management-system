@@ -53,33 +53,6 @@ def get_or_create_guest(email, name):
 guest_record = get_or_create_guest(user_email, user_info["name"])
 guest_id = guest_record["guest_id"]
 
-# --- TỰ ĐỘNG MỞ RỘNG DATABASE CHO TÍNH NĂNG B2B ---
-with get_db() as db:
-    try:
-        db.execute(text("""
-            ALTER TABLE Events 
-            ADD COLUMN event_type VARCHAR(50) DEFAULT 'Conference',
-            ADD COLUMN target_audience VARCHAR(50) DEFAULT 'All',
-            ADD COLUMN is_private BOOLEAN DEFAULT FALSE,
-            ADD COLUMN access_code VARCHAR(50) DEFAULT NULL
-        """))
-        # Seed 1 số dữ liệu mẫu để Demo tính năng Private và Đối tượng
-        db.execute(text("UPDATE Events SET is_private = TRUE, access_code = 'VIP2026', target_audience = 'C-level / Executive' WHERE event_name LIKE '%Hội thảo AI%' OR event_name LIKE '%Diễn đàn Kinh tế%'"))
-        db.execute(text("UPDATE Events SET event_type = 'Trade Show' WHERE event_name LIKE '%Triển lãm%' OR event_name LIKE '%Ngày hội%'"))
-    except Exception:
-        pass
-        
-    try:
-        db.execute(text("""
-            ALTER TABLE Registrations 
-            ADD COLUMN ticket_count INT DEFAULT 1,
-            ADD COLUMN ticket_type VARCHAR(50) DEFAULT 'Standard',
-            ADD COLUMN vat_company VARCHAR(150) DEFAULT NULL,
-            ADD COLUMN vat_tax_code VARCHAR(50) DEFAULT NULL
-        """))
-    except Exception:
-        pass
-
 # --- HÀM POP-UP (DIALOG) THANH TOÁN VÀ XUẤT VÉ ---
 @st.dialog("Đăng ký Vé Tham Dự", width="large")
 def show_registration_dialog(eid, event_name, guest_id, cap, reg_count, price_val):

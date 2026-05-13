@@ -43,27 +43,6 @@ user_email = user_info.get("email")
 
 def get_or_create_guest(email, name):
     with get_db() as db:
-        # Đảm bảo bảng Guests có đầy đủ các cột mở rộng
-        for col, col_type in [
-            ("is_public", "BOOLEAN DEFAULT TRUE"),
-            ("job_title", "VARCHAR(150)"),
-            ("company", "VARCHAR(150)"),
-            ("gender", "VARCHAR(20)"),
-            ("dob", "DATE"),
-            ("bio", "TEXT"),
-            ("linkedin_url", "VARCHAR(255)"),
-            ("services_offered", "VARCHAR(255)"),
-            ("buying_intent", "VARCHAR(255)"),
-            ("is_verified", "BOOLEAN DEFAULT FALSE"),
-            ("kyc_status", "VARCHAR(50) DEFAULT 'Unverified'"),
-            ("portfolio_url", "VARCHAR(500)"),
-            ("video_url", "VARCHAR(500)")
-        ]:
-            try:
-                db.execute(text(f"ALTER TABLE Guests ADD COLUMN {col} {col_type}"))
-            except Exception:
-                pass
-            
         guest = db.execute(text("SELECT * FROM Guests WHERE email = :email"), {"email": email}).fetchone()
         if not guest:
             db.execute(text("INSERT INTO Guests (guest_name, email) VALUES (:name, :email)"), {"name": name, "email": email})

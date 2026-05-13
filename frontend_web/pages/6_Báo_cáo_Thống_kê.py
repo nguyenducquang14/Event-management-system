@@ -355,26 +355,6 @@ with tab_demographic:
     section(":material/pie_chart:", "Nhân khẩu học & Hành vi", "Phân tích chân dung khách hàng và nguồn dẫn (Traffic Sources).")
     
     with st.spinner("Đang phân tích dữ liệu khách hàng..."):
-        # Đảm bảo các cột dữ liệu nhân khẩu và khảo sát tồn tại trong DB trước khi truy vấn
-        from sqlalchemy import text
-        for col, col_type in [
-            ("gender", "VARCHAR(20)"),
-            ("dob", "DATE"),
-            ("job_title", "VARCHAR(150)"),
-            ("company", "VARCHAR(150)")
-        ]:
-            try:
-                with eng.begin() as conn:
-                    conn.execute(text(f"ALTER TABLE Guests ADD COLUMN {col} {col_type}"))
-            except Exception:
-                pass
-            
-        try:
-            with eng.begin() as conn:
-                conn.execute(text("ALTER TABLE Registrations ADD COLUMN group_details JSON"))
-        except Exception:
-            pass
-
         if owner_id:
             demo_data = db.events.execute_query(f"""
                 SELECT g.gender, g.dob, g.job_title, g.company, r.group_details
