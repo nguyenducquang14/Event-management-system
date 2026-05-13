@@ -34,13 +34,13 @@ if "Guest" not in roles:
 if "Admin" not in roles and "Organizer" not in roles:
     st.markdown("""
     <style>
-        /* Ẩn TẤT CẢ các menu quản trị, chỉ giữ lại 5 menu cuối cùng của Guest */
+        /* Ẩn TẤT CẢ các menu quản trị, chỉ giữ lại 5 menu của Guest */
         [data-testid="stSidebarNav"] ul li { display: none !important; }
-        [data-testid="stSidebarNav"] ul li:nth-last-child(1),
         [data-testid="stSidebarNav"] ul li:nth-last-child(2),
         [data-testid="stSidebarNav"] ul li:nth-last-child(3),
         [data-testid="stSidebarNav"] ul li:nth-last-child(4),
-        [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: list-item !important; }
+        [data-testid="stSidebarNav"] ul li:nth-last-child(5),
+        [data-testid="stSidebarNav"] ul li:nth-last-child(6) { display: list-item !important; }
     </style>
     """, unsafe_allow_html=True)
     with st.sidebar:

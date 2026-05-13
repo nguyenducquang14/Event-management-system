@@ -31,16 +31,13 @@ if "Organizer" not in roles and "Admin" not in roles:
 # --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
 st.markdown("""
 <style>
-    [data-testid="stSidebarNav"] ul li:nth-child(8),
-    [data-testid="stSidebarNav"] ul li:nth-child(9),
-    [data-testid="stSidebarNav"] ul li:nth-child(10),
-    [data-testid="stSidebarNav"] ul li:nth-child(11),
-    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    /* Ẩn các menu của Guest và trang styles.py không cần thiết */
     [data-testid="stSidebarNav"] ul li:nth-last-child(1),
     [data-testid="stSidebarNav"] ul li:nth-last-child(2),
     [data-testid="stSidebarNav"] ul li:nth-last-child(3),
     [data-testid="stSidebarNav"] ul li:nth-last-child(4),
-    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(6) { display: none !important; }
     
     /* --- GIAO DIỆN NỀN TRẮNG CHỮ ĐEN CHO DASHBOARD BAN TỔ CHỨC --- */
     [data-testid="stAppViewContainer"], .stApp {

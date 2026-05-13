@@ -6,6 +6,7 @@ Trang Quản lý Sự kiện — CRUD đầy đủ + data_editor + filter + dial
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
+import json
 from sqlalchemy import text
 from app.config import get_db as get_db_session
 
@@ -36,16 +37,13 @@ if not is_admin and not is_organizer:
 # --- ẨN CÁC MENU CỦA GUEST ĐỐI VỚI ADMIN/ORGANIZER ---
 st.markdown("""
 <style>
-    [data-testid="stSidebarNav"] ul li:nth-child(8),
-    [data-testid="stSidebarNav"] ul li:nth-child(9),
-    [data-testid="stSidebarNav"] ul li:nth-child(10),
-    [data-testid="stSidebarNav"] ul li:nth-child(11),
-    [data-testid="stSidebarNav"] ul li:nth-child(12),
+    /* Ẩn các menu của Guest và trang styles.py không cần thiết */
     [data-testid="stSidebarNav"] ul li:nth-last-child(1),
     [data-testid="stSidebarNav"] ul li:nth-last-child(2),
     [data-testid="stSidebarNav"] ul li:nth-last-child(3),
     [data-testid="stSidebarNav"] ul li:nth-last-child(4),
-    [data-testid="stSidebarNav"] ul li:nth-last-child(5) { display: none !important; }
+    [data-testid="stSidebarNav"] ul li:nth-last-child(5),
+    [data-testid="stSidebarNav"] ul li:nth-last-child(6) { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,6 +52,14 @@ if is_organizer and not is_admin:
     from app.database.repositories.organizer_repo import OrganizerRepository
     org_repo = OrganizerRepository()
     owner_id = org_repo.get_or_create_organizer(user_info.get("email"), user_info.get("name"))
+
+# Đảm bảo cột branding_config tồn tại
+with get_db_session() as sess:
+    try:
+        sess.execute(text("ALTER TABLE Events ADD COLUMN branding_config JSON"))
+        sess.commit()
+    except Exception:
+        pass # Bỏ qua nếu cột đã tồn tại
 
 # ── Load db ──────────────────────────────────────────────────
 @st.cache_resource
@@ -343,6 +349,20 @@ with tab_edit:
         )
         img_url = st.text_input("Link ảnh minh họa (URL)", value=prefill.get("image_url") or "", placeholder="Ví dụ: https://images.unsplash.com/...")
         desc = st.text_area("Mô tả", value=prefill.get("description") or "")
+        
+        st.markdown("---")
+        section(":material/palette:", "Tùy chỉnh Giao diện (Branding)")
+        branding_conf = {}
+        if prefill.get("branding_config"):
+            try:
+                branding_conf = json.loads(prefill["branding_config"])
+            except (json.JSONDecodeError, TypeError):
+                branding_conf = {}
+        c_brand1, c_brand2, c_brand3 = st.columns(3)
+        p_color = c_brand1.color_picker("Màu chủ đạo", value=branding_conf.get("primary_color", "#FF4B4B"))
+        bg_color = c_brand2.color_picker("Màu nền trang", value=branding_conf.get("background_color", "#F8F9FA"))
+        txt_color = c_brand3.color_picker("Màu chữ", value=branding_conf.get("text_color", "#212529"))
+        banner_url = st.text_input("Link ảnh bìa (Banner URL)", value=branding_conf.get("banner_url", ""), placeholder="https://example.com/banner.jpg")
 
         btn_label = "Tạo sự kiện" if mode.startswith("Tạo") else "Lưu thay đổi"
         btn_icon = ":material/add:" if mode.startswith("Tạo") else ":material/save:"
@@ -352,6 +372,14 @@ with tab_edit:
         if not name or not v_options or not o_options:
             show_error("Điền đầy đủ thông tin bắt buộc.")
         else:
+            branding_config_dict = {
+                "primary_color": p_color,
+                "background_color": bg_color,
+                "text_color": txt_color,
+                "banner_url": banner_url,
+                "font_family": "'Inter', sans-serif"
+            }
+            branding_config_json = json.dumps(branding_config_dict, ensure_ascii=False)
             try:
                 data = EventCreate(
                     event_name=name,
@@ -364,16 +392,19 @@ with tab_edit:
                     description=desc or None,
                 )
                 if mode.startswith("Tạo"):
+                    event_id_to_update = None
                     new_id = db.events.create(data)
-                    if img_url:
-                        with get_db_session() as sess:
-                            sess.execute(text("UPDATE Events SET image_url = :img WHERE event_id = :id"), {"img": img_url, "id": new_id})
+                    event_id_to_update = new_id
                     show_success(f"Đã tạo sự kiện '{name}' (ID: {new_id})!")
                 else:
                     db.events.update(edit_id, data)
-                    with get_db_session() as sess:
-                        sess.execute(text("UPDATE Events SET image_url = :img WHERE event_id = :id"), {"img": img_url if img_url else None, "id": edit_id})
+                    event_id_to_update = edit_id
                     show_success(f"Đã cập nhật sự kiện #{edit_id}!")
+                
+                if event_id_to_update:
+                    with get_db_session() as sess:
+                        sess.execute(text("UPDATE Events SET image_url = :img, branding_config = :brand WHERE event_id = :id"), 
+                                     {"img": img_url if img_url else None, "brand": branding_config_json, "id": event_id_to_update})
                 st.rerun()
             except Exception as e:
                 show_error(f"Lỗi: {e}")
