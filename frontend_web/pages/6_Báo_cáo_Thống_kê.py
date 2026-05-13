@@ -145,7 +145,7 @@ st.markdown("")
 # ── TABS ─────────────────────────────────────────────────────
 (tab_event, tab_ticket, tab_demographic, tab_guest, tab_venue,
  tab_finance, tab_period, tab_excel) = st.tabs([
-    ":material/event: Sự kiện", ":material/confirmation_number: Tiến độ Bán vé", ":material/pie_chart: Nhân khẩu & Hành vi", ":material/emoji_events: Top khách", ":material/apartment: Địa điểm",
+    ":material/event: Sự kiện", ":material/confirmation_number: Tiến độ Bán vé", ":material/pie_chart: Nhân khẩu & Hành vi", ":material/emoji_events: Top khách", ":material/location_on: Địa điểm",
     ":material/payments: Tài chính", ":material/calendar_month: Báo cáo kỳ", ":material/download: Xuất Excel",
 ])
 
@@ -555,7 +555,7 @@ with tab_guest:
 # TAB 5: ĐỊA ĐIỂM
 # ════════════════════════════════════════════════════════════
 with tab_venue:
-    section(":material/apartment:", "Thống kê sử dụng địa điểm")
+    section(":material/location_on:", "Thống kê sử dụng địa điểm")
 
     with st.spinner():
         if owner_id:
