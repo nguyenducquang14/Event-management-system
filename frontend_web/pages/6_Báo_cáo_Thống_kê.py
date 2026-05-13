@@ -20,6 +20,10 @@ GOLDEN_UI_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     html, body, [class*="st-"], .stMarkdownContainer, p, h1, h2, h3, h4, h5, h6, span, div, button, input, label, li { font-family: 'Inter', sans-serif !important; }
+    /* Ensure Streamlit's material icons use the correct font */
+    .material-symbols-rounded {
+        font-family: 'Material Symbols Rounded' !important;
+    }
     .block-container { padding: 2.5rem 3rem 4rem 3rem !important; max-width: 1200px !important; }
     .stApp { background-color: #F8FAFC !important; }
     h1, h2, h3, h4, h5, h6 { color: #0F172A !important; font-weight: 700 !important; }
