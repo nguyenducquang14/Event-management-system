@@ -194,7 +194,7 @@ with tab_match:
     
     if not has_tags:
         st.warning("Bạn chưa cập nhật 'Nhu cầu Kết nối' (Buying Intent / Services Offered) trong phần Hồ Sơ Doanh Nghiệp. Vui lòng cập nhật để AI có thể phân tích và đề xuất!")
-        st.button("👉 Cập nhật Hồ sơ ngay", on_click=lambda: st.switch_page("pages/10_Hồ_Sơ_Doanh_Nghiệp.py"))
+        st.button("👉 Cập nhật Hồ sơ ngay", on_click=lambda: st.switch_page("pages/10_Quản_Lý_Tài_Khoản.py"))
     elif not other_guests:
         st.info("Chưa có đối tác nào đủ dữ liệu để hệ thống ghép cặp.")
     else:
